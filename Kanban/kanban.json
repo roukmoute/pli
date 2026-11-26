@@ -1,0 +1,7 @@
+{
+  "default_agent": "codex",
+  "spec_agent": "claude",
+  "spec_files": [
+    ".specs/piece-TlW9Y4/cahier-des-charges-webmail-infomaniak-hey.md"
+  ]
+}

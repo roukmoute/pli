@@ -1,0 +1,37 @@
+# Compilation, dépendances et tests
+target/
+node_modules/
+dist/
+web/dist/
+coverage/
+playwright-report/
+test-results/
+
+# Données locales et secrets
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Fichiers de travail de kanb-ian
+Kanban/.runs/
+Kanban/.leases/
+Kanban/.downloads/
+Kanban/.lead/
+Kanban/.journal/
+
+# Éditeurs et systèmes d’exploitation
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
