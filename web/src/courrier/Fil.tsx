@@ -103,9 +103,7 @@ function Pile(props: { fil: string; id?: string; cache: Lectures }) {
     if (!e.valeur.some((m) => m.id === selection)) return;
     return { messages: e.valeur, dernier, selection };
   };
-  onSettled(() => {
-    void entree.charger();
-  });
+  onSettled(() => props.cache.consulter(props.fil));
   return (
     <Show
       when={conversation()}

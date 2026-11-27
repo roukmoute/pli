@@ -197,13 +197,24 @@
 .fils li + li {
   border-top: 1px solid var(--bord);
 }
+.rangee {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  border-radius: 0.55rem;
+}
+.rangee[data-choisi] {
+  outline: var(--contour-selection);
+  outline-offset: -2px;
+  background: var(--fond);
+}
 .ligne {
   width: 100%;
   min-height: var(--hauteur-ligne);
   padding: 0.7rem 0.75rem;
   display: grid;
-  grid-template-columns: auto minmax(6rem, 0.7fr) minmax(0, 1.45fr) auto;
-  grid-template-areas: "portrait nom objet date" "portrait nom extrait indicateurs";
+  grid-template-columns: minmax(6rem, 0.7fr) minmax(0, 1.45fr) auto;
+  grid-template-areas: "nom objet date" "nom extrait indicateurs";
   column-gap: 0.75rem;
   row-gap: 0.1rem;
   align-items: center;
@@ -218,7 +229,88 @@
   background: var(--fond);
 }
 .portrait {
-  grid-area: portrait;
+  position: relative;
+  cursor: pointer;
+}
+.portrait,
+.etoile {
+  display: grid;
+  place-items: center;
+  width: var(--cible-tactile);
+  min-height: var(--cible-tactile);
+  border-radius: 50%;
+}
+.portrait input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.portrait:has(:focus-visible) {
+  outline: var(--anneau-focus);
+}
+.coche {
+  display: none;
+}
+.portrait:has(:checked) .coche {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  pointer-events: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-weight: 800;
+  color: var(--sur-commande);
+  background: var(--commande);
+}
+.etoile {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: var(--texte-secondaire);
+}
+.etoile svg {
+  width: 1.1rem;
+}
+.etoile:where([aria-pressed="true"]) svg {
+  fill: currentColor;
+  color: var(--commande);
+}
+.selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.85rem;
+  margin-top: 0.75rem;
+  color: var(--texte-secondaire);
+  font-size: 0.9rem;
+}
+.touteLaPage {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--cible-tactile);
+  cursor: pointer;
+}
+.touteLaPage input {
+  accent-color: var(--commande);
+}
+.boutonLot {
+  min-height: var(--cible-tactile);
+  padding-inline: 0.65rem;
+  border: 1px solid var(--bord-controle);
+  border-radius: var(--rayon-controle);
+  background: var(--surface);
+  color: var(--commande);
+  cursor: pointer;
+}
+.selection [role="alert"] {
+  color: var(--erreur);
 }
 .correspondant,
 .objet,
@@ -368,8 +460,8 @@
     padding-inline: 0.85rem;
   }
   .ligne {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: "portrait nom date" "portrait objet indicateurs" ". extrait extrait";
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "nom date" "objet indicateurs" "extrait extrait";
     gap: 0.08rem 0.5rem;
     padding-inline: 0.35rem;
   }

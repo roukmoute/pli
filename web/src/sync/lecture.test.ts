@@ -181,3 +181,24 @@ it("distingue l’identité du fil ouvert et rejette les types MIME inconnus", a
   expect(confirmer).not.toHaveBeenCalled();
   await expect(imageIntegree("4-5-6", 7)).rejects.toThrow("image");
 });
+
+it("recharge uniquement le fil encore à l’écran lorsqu’un lot modifie des en-têtes", async () => {
+  const fetch = vi.fn(async () => Response.json([]));
+  vi.stubGlobal("fetch", fetch);
+  const cache = creerLectures(() => {});
+  const a = cache.fil("a");
+  const b = cache.fil("b");
+  const fermerA = cache.consulter("a");
+  const fermerB = cache.consulter("b");
+  fermerA();
+  await cache.actualiserFils(["a", "b", "inconnu"]);
+  expect(fetch).toHaveBeenCalledTimes(3);
+  expect(cache.fil("a")).not.toBe(a);
+  expect(cache.fil("b")).toBe(b);
+  await cache.actualiserFils(["a"]);
+  expect(fetch).toHaveBeenCalledTimes(3);
+  fermerB();
+  await cache.actualiserFils(["b"]);
+  expect(cache.fil("b")).not.toBe(b);
+  expect(fetch).toHaveBeenCalledTimes(3);
+});

@@ -12,8 +12,10 @@ import { Avatar } from "../components/Avatar";
 import { t } from "../i18n";
 import { Icone } from "../icons/Icone";
 import type { Courrier, Fil, Section, Vue } from "../sync";
+import type { Selection } from "../sync/selection";
 import styles from "./courrier.module.css";
 import { memoriserAncre, restaurerPosition } from "./position";
+import { BarreSelection } from "./Selection";
 
 const dates = new Intl.DateTimeFormat("fr", {
   day: "numeric",
@@ -21,20 +23,43 @@ const dates = new Intl.DateTimeFormat("fr", {
   year: "numeric",
 });
 const reperes = [
-  ["etoile", "etoile", "star"],
   ["piece_jointe", "pieceJointe", "attachment"],
   ["repondu", "repondre", "answered"],
   ["transfere", "transferer", "forwarded"],
 ] as const;
 
-function Ligne(props: { fil: Fil; focus: () => void; ouvrir: () => void }) {
+function Ligne(props: {
+  fil: Fil;
+  focus: () => void;
+  ouvrir: () => void;
+  selection: Selection;
+}) {
   const nom = () =>
     props.fil.expediteur.nom ||
     props.fil.expediteur.adresse ||
     t("unknownSender");
   const date = () => new Date(props.fil.date * 1000);
+  const coche = () => props.selection.choisis().has(props.fil.id);
+  const objet = () => props.fil.objet || t("noSubject");
   return (
-    <li>
+    <li class={styles.rangee} data-choisi={coche() ? "oui" : undefined}>
+      <label class={styles.portrait}>
+        <input
+          type="checkbox"
+          aria-label={`${t("select")} ${objet()}`}
+          checked={coche()}
+          disabled={props.selection.enCours()}
+          onChange={(e) =>
+            props.selection.cocher([props.fil.id], e.currentTarget.checked)
+          }
+        />
+        <span aria-hidden="true">
+          <Avatar nom={nom()} />
+        </span>
+        <span aria-hidden="true" class={styles.coche}>
+          ✓
+        </span>
+      </label>
       <button
         type="button"
         class={styles.ligne}
@@ -43,11 +68,10 @@ function Ligne(props: { fil: Fil; focus: () => void; ouvrir: () => void }) {
         onClick={props.ouvrir}
       >
         <span class={styles.sr}>{t(props.fil.non_lu ? "unread" : "read")}</span>
-        <span class={styles.portrait} aria-hidden="true">
-          <Avatar nom={nom()} />
-        </span>
         <span class={styles.correspondant}>{nom()}</span>
-        <span class={styles.objet}>{props.fil.objet || t("noSubject")}</span>
+        <span id={`objet-${props.fil.id}`} class={styles.objet}>
+          {objet()}
+        </span>
         <span class={styles.extrait}>{props.fil.extrait}</span>
         <span class={styles.indicateurs}>
           <For each={reperes}>
@@ -65,6 +89,23 @@ function Ligne(props: { fil: Fil; focus: () => void; ouvrir: () => void }) {
         <time class={styles.date} datetime={date().toISOString()}>
           {dates.format(date())}
         </time>
+      </button>
+      <button
+        type="button"
+        class={styles.etoile}
+        aria-label={t("star")}
+        aria-describedby={`objet-${props.fil.id}`}
+        aria-pressed={props.fil.etoile ? "true" : "false"}
+        disabled={props.selection.enCours()}
+        onClick={() =>
+          void props.selection.marquer(
+            [props.fil.id],
+            "etoile",
+            !props.fil.etoile,
+          )
+        }
+      >
+        <Icone nom="etoile" libelle={t("star")} />
       </button>
     </li>
   );
@@ -171,6 +212,12 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                     </button>
                   </p>
                 </Show>
+                <BarreSelection
+                  ids={[...contenu().nouveaux, ...contenu().deja_vus].map(
+                    (f) => f.id,
+                  )}
+                  selection={entree.selection}
+                />
                 <For each={["nouveaux", "deja_vus"] as const}>
                   {(section) => (
                     <section
@@ -201,6 +248,7 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                             {(fil) => (
                               <Ligne
                                 fil={fil()}
+                                selection={entree.selection}
                                 focus={() => retenir(section, fil().id)}
                                 ouvrir={() => {
                                   retenir(section, fil().id);

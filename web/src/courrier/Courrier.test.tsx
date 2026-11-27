@@ -169,7 +169,12 @@ it("restaure la section, la position et la ligne pendant qu’une actualisation 
   const nouvelle = await view.findByRole("button", { name: /Lettre neuve/ });
   expect(nouvelle.getAttribute("data-fil")).toBe("neuve");
   expect(within(nouvelle).getByText("Non lu")).toBeTruthy();
-  for (const nom of ["Étoile", "Pièce jointe", "Répondu", "Transféré"]) {
+  expect(
+    within(nouvelle.parentElement as HTMLElement)
+      .getByRole("button", { name: "Étoile" })
+      .getAttribute("aria-pressed"),
+  ).toBe("true");
+  for (const nom of ["Pièce jointe", "Répondu", "Transféré"]) {
     expect(within(nouvelle).getByLabelText(nom)).toBeTruthy();
   }
   expect(nouvelle.querySelector("time")?.dateTime).toBe(
@@ -538,4 +543,51 @@ it("ouvre le Screener depuis Réception et l’historique depuis l’avatar", as
   await view.findByRole("heading", { name: "Historique du tri" });
   expect(compte.open).toBe(false);
   expect(window.location.pathname).toBe("/historique-du-tri");
+});
+
+it("annonce la sélection de la page et conserve ses cases pendant une visite du Flux", async () => {
+  const { view, fetchMock } = ouvrir();
+  const casePage = () =>
+    view.getByRole<HTMLInputElement>("checkbox", {
+      name: "Sélectionner la page",
+    });
+  const caseNeuve = () =>
+    view.getByRole<HTMLInputElement>("checkbox", {
+      name: "Sélectionner Lettre neuve",
+    });
+  const caseRelue = () =>
+    view.getByRole<HTMLInputElement>("checkbox", {
+      name: "Sélectionner Lettre relue",
+    });
+  await view.findByRole("checkbox", { name: "Sélectionner Lettre neuve" });
+  fireEvent.click(caseNeuve());
+  await waitFor(() => expect(casePage().indeterminate).toBe(true));
+  expect(casePage().checked).toBe(false);
+  expect(view.getByRole("status").textContent).toBe("1 fil sélectionné sur 2");
+  expect(caseNeuve().closest("li")?.dataset.choisi).toBe("oui");
+  fireEvent.click(view.getByRole("button", { name: "Menu" }));
+  fireEvent.click(await view.findByRole("link", { name: "Flux" }));
+  await view.findByText("Aucun nouveau fil.");
+  expect(view.queryByRole("button", { name: "Marquer comme lu" })).toBeNull();
+  fireEvent.click(view.getByRole("button", { name: "Menu" }));
+  fireEvent.click(await view.findByRole("link", { name: "Réception" }));
+  await view.findByRole("checkbox", { name: "Sélectionner Lettre neuve" });
+  expect(caseNeuve().checked).toBe(true);
+  expect(caseRelue().checked).toBe(false);
+  fireEvent.click(casePage());
+  await waitFor(() => expect(caseRelue().checked).toBe(true));
+  expect(casePage().indeterminate).toBe(false);
+  expect(casePage().checked).toBe(true);
+  expect(view.getByRole("status").textContent).toBe(
+    "2 fils sélectionnés sur 2",
+  );
+  fireEvent.click(casePage());
+  await waitFor(() => expect(caseNeuve().checked).toBe(false));
+  expect(caseRelue().checked).toBe(false);
+  expect(view.getByRole("status").textContent).toBe(
+    "0 fils sélectionnés sur 2",
+  );
+  expect(
+    fetchMock.mock.calls.some(([url]) => String(url).includes("/threads/")),
+  ).toBe(false);
 });

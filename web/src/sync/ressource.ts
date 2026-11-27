@@ -49,5 +49,9 @@ export function ressource<T>(lire: () => Promise<T>) {
       publier({ statut: "pret", valeur: maj(initial), perime: false });
     else if (lectureSuspendue) void charger();
   }
-  return { etat, charger, corriger };
+  function recharger() {
+    enCours = undefined;
+    return charger();
+  }
+  return { etat, charger, corriger, recharger };
 }

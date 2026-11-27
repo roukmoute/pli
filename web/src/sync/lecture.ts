@@ -52,7 +52,7 @@ export function appliquerLecture(
 
 function cache<T>(lire: (id: string) => Promise<T>) {
   const entries = new Map<string, ReturnType<typeof ressource<T>>>();
-  return (id: string) => {
+  function obtenir(id: string) {
     const existante = entries.get(id);
     if (existante) entries.delete(id);
     const entree = existante || ressource(() => lire(id));
@@ -60,7 +60,10 @@ function cache<T>(lire: (id: string) => Promise<T>) {
     if (entries.size > 40)
       entries.delete(entries.keys().next().value as string);
     return entree;
-  };
+  }
+  return Object.assign(obtenir, {
+    oublier: (id: string) => entries.delete(id),
+  });
 }
 
 export function creerLectures(confirmer: (lecture: Lecture) => void) {
@@ -92,7 +95,21 @@ export function creerLectures(confirmer: (lecture: Lecture) => void) {
     enCours.set(id, ecriture);
     return ecriture;
   }
-  return { fil, corps, ouvrir };
+  let filAffiche: string | undefined;
+  function consulter(id: string) {
+    filAffiche = id;
+    void fil(id).charger();
+    return () => {
+      if (filAffiche === id) filAffiche = undefined;
+    };
+  }
+  async function actualiserFils(ids: string[]) {
+    // Seul le fil encore ouvert a besoin d’en-têtes sur le réseau.
+    for (const id of ids) if (id !== filAffiche) fil.oublier(id);
+    if (filAffiche && ids.includes(filAffiche))
+      await fil(filAffiche).recharger();
+  }
+  return { fil, corps, ouvrir, consulter, actualiserFils };
 }
 export type Lectures = ReturnType<typeof creerLectures>;
 
