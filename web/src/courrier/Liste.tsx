@@ -1,3 +1,4 @@
+import { useNavigate } from "@solidjs/router";
 import { createEffect, For, Match, onSettled, Show, Switch } from "solid-js";
 import { Avatar } from "../components/Avatar";
 import { t } from "../i18n";
@@ -61,6 +62,7 @@ function Ligne(props: { fil: Fil; focus: () => void }) {
 }
 
 export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
+  const naviguer = useNavigate();
   const entree = props.courrier.obtenirVue(props.vue);
   const etat = entree.etat;
   const page = () => {
@@ -123,7 +125,11 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
         </header>
         <Show when={props.vue === "reception" && page()}>
           {(p) => (
-            <button type="button" disabled class={styles.tri}>
+            <button
+              type="button"
+              class={styles.tri}
+              onClick={() => naviguer("/nouveaux-expediteurs")}
+            >
               {t("screener")} <strong>{p().expediteurs_en_attente}</strong>
             </button>
           )}

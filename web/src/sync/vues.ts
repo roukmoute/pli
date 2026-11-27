@@ -1,5 +1,8 @@
-import { createSignal } from "solid-js";
 import { lireDossiers, lirePage } from "./pages-api";
+import { amorcerVue, projeterTri } from "./projection-tri";
+import { type Etat, ressource } from "./ressource";
+import { creerTri } from "./tri";
+import type { IntentionTri } from "./tri-api";
 
 export type Vue = "reception" | "flux" | "justificatifs" | `dossier/${number}`;
 export type Section = "nouveaux" | "deja_vus";
@@ -39,38 +42,6 @@ export interface Dossier {
   hidden: boolean;
 }
 
-type Etat<T> =
-  | { statut: "chargement" | "erreur" }
-  | { statut: "pret"; valeur: T; perime: boolean };
-
-function ressource<T>(lire: () => Promise<T>) {
-  const [etat, publier] = createSignal<Etat<T>>({ statut: "chargement" });
-  let enCours: Promise<void> | undefined;
-  function charger(): Promise<void> {
-    if (enCours) return enCours;
-    const precedent = etat();
-    if (precedent.statut === "erreur") publier({ statut: "chargement" });
-    enCours = lire()
-      .then(
-        (valeur) => {
-          publier({ statut: "pret", valeur, perime: false });
-        },
-        () => {
-          publier(
-            precedent.statut === "pret"
-              ? { ...precedent, perime: true }
-              : { statut: "erreur" },
-          );
-        },
-      )
-      .finally(() => {
-        enCours = undefined;
-      });
-    return enCours;
-  }
-  return { etat, charger };
-}
-
 export interface Repere {
   defilement: number;
   section: Section;
@@ -78,26 +49,90 @@ export interface Repere {
   ancre?: { fil: string; decalage: number };
 }
 
-function nouvelleVue(compte: number, vue: Vue) {
+function nouvelleVue(
+  compte: number,
+  vue: Vue,
+  afficher: (base: Etat<PageFils>) => Etat<PageFils>,
+) {
   const repere: Repere = { defilement: 0, section: "nouveaux" };
-  return { ...ressource(() => lirePage(compte, vue)), repere };
+  const source = ressource(() => lirePage(compte, vue));
+  return {
+    source,
+    charger: source.charger,
+    etat: () => afficher(source.etat()),
+    repere,
+  };
 }
 
-// Chaque session affichée possède son propre cache. Une réponse tardive d’un autre
-// compte reste liée à l’ancienne instance, même si les deux boîtes ont une vue du même nom.
+// Le cache et les opérations de tri appartiennent à la session affichée.
 export function creerCourrier(compte: number) {
   const vues = new Map<Vue, ReturnType<typeof nouvelleVue>>();
   const dossiers = ressource(lireDossiers);
+  const tri = creerTri(compte, confirmer);
+
+  function estInbox(vue: Vue) {
+    const liste = dossiers.etat();
+    return (
+      liste.statut === "pret" &&
+      liste.valeur.some((d) => d.role === "inbox" && `dossier/${d.id}` === vue)
+    );
+  }
+  function compteur() {
+    const reception = vues.get("reception")?.source.etat();
+    return reception?.statut === "pret"
+      ? reception.valeur.expediteurs_en_attente
+      : 0;
+  }
+  function afficher(vue: Vue, etat: Etat<PageFils>): Etat<PageFils> {
+    const intentions = tri.intentions();
+    if (!intentions.length) return etat;
+    const inbox = estInbox(vue);
+    const page =
+      etat.statut === "pret"
+        ? etat.valeur
+        : amorcerVue(compte, vue, intentions, inbox, compteur());
+    if (!page) return etat;
+    const valeur = intentions.reduce(
+      (p, i) => projeterTri(p, vue, i, inbox),
+      page,
+    );
+    return {
+      statut: "pret",
+      valeur,
+      perime: etat.statut === "pret" && etat.perime,
+    };
+  }
+  function confirmer(intention: IntentionTri, revision: number) {
+    const attente = compteur();
+    if (intention.choix === "accepte") obtenirVue(intention.destination);
+    for (const [vue, entree] of vues) {
+      const inbox = estInbox(vue);
+      entree.source.corriger(
+        (page) =>
+          page.revision < revision
+            ? projeterTri(page, vue, intention, inbox)
+            : page,
+        amorcerVue(compte, vue, [intention], inbox, attente),
+      );
+      if (
+        inbox ||
+        vue === intention.entree.destination ||
+        vue === intention.destination
+      )
+        void entree.charger();
+    }
+  }
   function obtenirVue(vue: Vue) {
     let entree = vues.get(vue);
     if (!entree) {
-      entree = nouvelleVue(compte, vue);
+      entree = nouvelleVue(compte, vue, (etat) => afficher(vue, etat));
       vues.set(vue, entree);
     }
     return entree;
   }
   return {
     dossiers,
+    tri,
     obtenirVue,
     chargerVue: (vue: Vue) => obtenirVue(vue).charger(),
   };

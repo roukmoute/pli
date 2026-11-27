@@ -13,6 +13,7 @@ import {
 import styles from "./courrier.module.css";
 import { Liste } from "./Liste";
 import Menu from "./Menu";
+import EcranTri from "./Tri";
 
 interface Props {
   compte: number;
@@ -104,10 +105,20 @@ function Barre(props: Props & { cache: CacheCourrier; children: JSX.Element }) {
         </button>
         <details class={styles.compte}>
           <summary aria-label={props.adresse}>
-            <Avatar nom={props.adresse} />
+            <span aria-hidden="true">
+              <Avatar nom={props.adresse} />
+            </span>
             <span class={styles.adresse}>{props.adresse}</span>
           </summary>
           <div class={styles.actionsCompte}>
+            <a
+              href="/historique-du-tri"
+              onClick={(e) =>
+                e.currentTarget.closest("details")?.removeAttribute("open")
+              }
+            >
+              {t("screenHistory")}
+            </a>
             <button
               type="button"
               onClick={(e) => void props.fermer(e.currentTarget)}
@@ -140,6 +151,14 @@ export default function Courrier(props: Props) {
         component: liste("reception", () => props.textes.inbox),
       },
       { path: "/flux", component: liste("flux", () => t("feed")) },
+      {
+        path: "/nouveaux-expediteurs",
+        component: () => <EcranTri mode="attente" tri={cache.tri} />,
+      },
+      {
+        path: "/historique-du-tri",
+        component: () => <EcranTri mode="historique" tri={cache.tri} />,
+      },
       {
         path: "/justificatifs",
         component: liste("justificatifs", () => t("paperTrail")),

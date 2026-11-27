@@ -19,7 +19,7 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
   min-height: 4.25rem;
@@ -76,6 +76,7 @@
 .compte {
   justify-self: end;
   min-width: 0;
+  max-width: 100%;
   position: relative;
 }
 .compte summary {
@@ -93,6 +94,7 @@
 .adresse {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .actionsCompte {
   position: absolute;
@@ -104,6 +106,13 @@
   border-radius: var(--rayon-controle);
   background: var(--surface);
   box-shadow: 0 5px 22px #24223712;
+}
+.actionsCompte a {
+  display: flex;
+  align-items: center;
+  min-height: var(--cible-tactile);
+  padding-inline: 0.5rem;
+  color: var(--commande);
 }
 .actionsCompte button,
 .defilement p button,

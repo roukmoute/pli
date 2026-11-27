@@ -1,0 +1,113 @@
+.entete,
+.identite,
+.commandes {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.entete {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.entete h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4.6vw, 3rem);
+  line-height: 1.12;
+}
+.entete a,
+.lettres summary {
+  color: var(--commande);
+  font-weight: 650;
+}
+.entete a,
+.lettres summary,
+.commandes button,
+.commandes select {
+  min-height: var(--cible-tactile);
+}
+.entete a,
+.lettres summary {
+  align-content: center;
+}
+.explication,
+.identite p,
+.apercu p,
+.lettres small {
+  color: var(--texte-secondaire);
+}
+.explication {
+  max-width: 65ch;
+  margin-block: 0.9rem 1.6rem;
+}
+.expediteur,
+.vide,
+.avis {
+  margin-block: 1rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon-surface);
+  overflow-wrap: anywhere;
+}
+.identite h2 {
+  margin: 0;
+  line-height: 1.22;
+  font-size: 1.12rem;
+}
+.identite p,
+.apercu p {
+  margin: 0.25rem 0 0;
+}
+.apercu,
+.lettres {
+  margin-top: 1rem;
+}
+.decision {
+  color: var(--tri);
+  font-weight: 700;
+}
+.commandes {
+  margin-top: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.commandes label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+  color: var(--texte-secondaire);
+}
+.commandes button,
+.commandes select,
+.lettres button,
+.avis > button {
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--rayon-controle);
+  background: var(--surface);
+  color: var(--texte);
+  border: 1px solid var(--bord-controle);
+  font: inherit;
+}
+.commandes .admettre {
+  background: var(--tri);
+  color: var(--sur-commande);
+  border-color: var(--tri);
+  font-weight: 650;
+}
+.lettres small {
+  display: block;
+}
+.avis {
+  border-color: var(--tri);
+}
+.avis > button {
+  margin-top: 1rem;
+}
+@media (max-width: 38rem) {
+  .commandes label {
+    width: 100%;
+  }
+  .commandes button {
+    flex: 1;
+  }
+}

@@ -3,6 +3,7 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details?: unknown,
   ) {
     super(message);
   }
@@ -17,9 +18,9 @@ export function responseError(status: number, body: unknown): ApiError {
     "message" in body &&
     typeof body.message === "string"
   ) {
-    return new ApiError(status, body.code, body.message);
+    return new ApiError(status, body.code, body.message, body);
   }
-  return new ApiError(status, "http_error", `Erreur HTTP ${status}.`);
+  return new ApiError(status, "http_error", `Erreur HTTP ${status}.`, body);
 }
 
 const sessionEvents = new EventTarget();

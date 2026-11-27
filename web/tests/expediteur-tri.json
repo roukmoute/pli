@@ -1,0 +1,72 @@
+{
+  "adresse": "atelier@recette.test",
+  "etat": "en_attente",
+  "destination": "reception",
+  "revision": 1,
+  "date_decision": null,
+  "apercus": [
+    {
+      "id": "Lettre de mai",
+      "objet": "Lettre de mai",
+      "expediteur": {
+        "nom": "L’Atelier",
+        "adresse": "atelier@recette.test"
+      },
+      "extrait": "Nouvelles du verger",
+      "date": 12,
+      "nombre_messages": 1,
+      "non_lu": true,
+      "etoile": false,
+      "piece_jointe": false,
+      "repondu": false,
+      "transfere": false
+    },
+    {
+      "id": "Lettre de mars",
+      "objet": "Lettre de mars",
+      "expediteur": {
+        "nom": "L’Atelier",
+        "adresse": "atelier@recette.test"
+      },
+      "extrait": "Nouvelles du verger",
+      "date": 2,
+      "nombre_messages": 1,
+      "non_lu": false,
+      "etoile": false,
+      "piece_jointe": false,
+      "repondu": false,
+      "transfere": false
+    }
+  ],
+  "messages": [
+    {
+      "uid": 20,
+      "generation": 1,
+      "fil": "Lettre de mai",
+      "nom": "L’Atelier",
+      "objet": "Lettre de mai",
+      "extrait": "Nouvelles du verger",
+      "date": 12,
+      "non_lu": true,
+      "etoile": false,
+      "piece_jointe": false,
+      "repondu": false,
+      "transfere": false
+    },
+    {
+      "uid": 19,
+      "generation": 1,
+      "fil": "Lettre de mars",
+      "nom": "L’Atelier",
+      "objet": "Lettre de mars",
+      "extrait": "Nouvelles du verger",
+      "date": 2,
+      "non_lu": false,
+      "etoile": false,
+      "piece_jointe": false,
+      "repondu": false,
+      "transfere": false
+    }
+  ],
+  "suivant": null
+}

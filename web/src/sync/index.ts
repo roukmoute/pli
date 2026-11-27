@@ -3,6 +3,8 @@ import { getJson } from "./api";
 export { ApiError, onSessionExpired } from "./api";
 export * from "./servers";
 export * from "./session";
+export type { Tri } from "./tri";
+export type { DestinationTri, Expediteur, ListeTri } from "./tri-api";
 export * from "./vues";
 
 export interface ServiceHealth {
