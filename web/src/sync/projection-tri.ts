@@ -18,7 +18,7 @@ function fusionner(ancien: Fil, ajoute: Fil): Fil {
   };
 }
 
-function ordre(a: Fil, b: Fil) {
+export function comparerFils(a: Fil, b: Fil) {
   if (a.date !== b.date) return b.date - a.date;
   if (a.id === b.id) return 0;
   return a.id < b.id ? 1 : -1;
@@ -50,7 +50,7 @@ export function projeterTri(
       fils.set(fil.id, actuel ? fusionner(actuel, fil) : fil);
     }
   }
-  const premiere = Array.from(fils.values()).sort(ordre).slice(0, 20);
+  const premiere = Array.from(fils.values()).sort(comparerFils).slice(0, 20);
   return {
     ...page,
     expediteurs_en_attente: attente,

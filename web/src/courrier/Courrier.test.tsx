@@ -96,6 +96,14 @@ function ouvrir(
         return Response.json(page({ vue: "justificatifs" }, [], []));
       case "/api/v1/folders/8/messages":
         return Response.json(page({ dossier: 8 }, [fil("atelier", true)], []));
+      case "/api/v1/screener?details=true":
+      case "/api/v1/screener/historique?details=true":
+        return Response.json({
+          compte: 3,
+          revision: 2,
+          expediteurs: [],
+          suite: null,
+        });
       default:
         throw new Error(`Route inattendue ${url}`);
     }
@@ -466,4 +474,26 @@ it("permet de reprendre le chargement des dossiers et d’ouvrir directement un 
     within(menu).queryByText("Les dossiers sont indisponibles."),
   ).toBeNull();
   expect(view.getByRole("heading", { name: "Dossiers" })).toBeTruthy();
+});
+
+it("ouvre le Screener depuis Réception et l’historique depuis l’avatar", async () => {
+  const { view } = ouvrir();
+  fireEvent.click(
+    await view.findByRole("button", { name: /Nouveaux expéditeurs/ }),
+  );
+  await view.findByRole("heading", { name: "Nouveaux expéditeurs" });
+  await view.findByText("Aucun nouvel expéditeur à trier.");
+  const compte = view.container.querySelector("header details");
+  if (!(compte instanceof HTMLDetailsElement))
+    throw new Error("Menu du compte absent");
+  const resume = compte.querySelector("summary");
+  if (!resume) throw new Error("Commande du compte absente");
+  fireEvent.click(resume);
+  expect(compte.open).toBe(true);
+  fireEvent.click(
+    within(compte).getByRole("link", { name: "Historique du tri" }),
+  );
+  await view.findByRole("heading", { name: "Historique du tri" });
+  expect(compte.open).toBe(false);
+  expect(window.location.pathname).toBe("/historique-du-tri");
 });

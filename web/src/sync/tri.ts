@@ -15,6 +15,16 @@ type Avis =
   | { type: "conflit"; entree: Expediteur }
   | { type: "erreur"; adresse: string };
 
+function inscrire(catalogue: CatalogueTri, entree: Expediteur): CatalogueTri {
+  const expediteurs = [...catalogue.expediteurs];
+  const index = expediteurs.findIndex((e) => e.adresse >= entree.adresse);
+  if (index < 0) expediteurs.push(entree);
+  else if (expediteurs[index].adresse === entree.adresse)
+    expediteurs[index] = entree;
+  else expediteurs.splice(index, 0, entree);
+  return { ...catalogue, expediteurs };
+}
+
 export function creerTri(
   compte: number,
   confirmer: (intention: IntentionTri, revision: number) => void,
@@ -45,13 +55,7 @@ export function creerTri(
         ...c,
         expediteurs: c.expediteurs.filter((e) => e.adresse !== entree.adresse),
       }));
-      historique.corriger((c) => ({
-        ...c,
-        expediteurs: [
-          confirmee,
-          ...c.expediteurs.filter((e) => e.adresse !== entree.adresse),
-        ],
-      }));
+      historique.corriger((c) => inscrire(c, confirmee));
       if (conflit) annoncer({ type: "conflit", entree: confirmee });
     } catch {
       annoncer({ type: "erreur", adresse: entree.adresse });

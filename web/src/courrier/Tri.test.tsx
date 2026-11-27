@@ -167,3 +167,110 @@ it("présente l’historique vide et permet de fermer un avis de concurrence", a
   fireEvent.click(avis.getByRole("button", { name: "Fermer l’avis" }));
   await waitFor(() => expect(vue.queryByRole("alert")).toBeNull());
 });
+
+it("avance au titre suivant puis au titre de page lors du tri au clavier", async () => {
+  const autre = { ...atelier, adresse: "bois@recette.test" };
+  const accepteePour = (adresse: string) =>
+    Response.json({
+      compte: 3,
+      revision_compte: 9,
+      decision: { ...acceptee, adresse },
+    });
+  const source = vi
+    .fn()
+    .mockResolvedValueOnce(catalogue([atelier, autre]))
+    .mockResolvedValueOnce(accepteePour(atelier.adresse))
+    .mockResolvedValueOnce(accepteePour(autre.adresse));
+  const vue = ouvrir("attente", source);
+  const titre = vue.getByRole("heading", { name: "Nouveaux expéditeurs" });
+  const premier = await vue.findByRole("article", { name: atelier.adresse });
+  const second = within(vue.getByRole("article", { name: autre.adresse }));
+  const suivant = second.getByRole("heading");
+  const focus = vi.spyOn(suivant, "focus");
+  fireEvent.click(within(premier).getByRole("button", { name: "Accepter" }));
+  expect(document.activeElement).toBe(suivant);
+  expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  fireEvent.click(second.getByRole("button", { name: "Refuser" }));
+  expect(document.activeElement).toBe(titre);
+  await vue.findByText("Aucun nouvel expéditeur à trier.");
+});
+
+it("garde la page en cache en cas de coupure et reprend la pagination qui a échoué", async () => {
+  const adresse = atelier.adresse;
+  const source = vi
+    .fn()
+    .mockResolvedValueOnce(catalogue([atelier], adresse))
+    .mockRejectedValueOnce(new Error("Actualisation interrompue"))
+    .mockResolvedValueOnce(catalogue([atelier], adresse))
+    .mockRejectedValueOnce(new Error("Pagination interrompue"))
+    .mockResolvedValueOnce(
+      catalogue([{ ...atelier, adresse: "verger@recette.test" }]),
+    );
+  vi.stubGlobal("fetch", source);
+  const tri = creerTri(3, vi.fn());
+  await tri.historique.charger();
+  const vue = render(() => <EcranTri tri={tri} mode="historique" />);
+  expect(
+    vue.getByRole("heading", { name: "Historique du tri" }),
+  ).toBeInstanceOf(HTMLElement);
+  await vue.findByRole("alert");
+  expect(vue.getByRole("article", { name: adresse })).toBeInstanceOf(
+    HTMLElement,
+  );
+  fireEvent.click(within(vue.getByRole("alert")).getByRole("button"));
+  await waitFor(() => expect(vue.queryByRole("alert")).toBeNull());
+  fireEvent.click(
+    vue.getByRole("button", { name: "Afficher les expéditeurs suivants" }),
+  );
+  const avis = await vue.findByRole("alert");
+  fireEvent.click(within(avis).getByRole("button"));
+  await vue.findByRole("article", { name: "verger@recette.test" });
+  expect(source.mock.calls.slice(-2).map(([url]) => url)).toEqual(
+    Array(2).fill(
+      "/api/v1/screener/historique?details=true&apres=atelier%40recette.test",
+    ),
+  );
+});
+
+it("annonce le chargement initial et accepte le choix révisé depuis l’avis", async () => {
+  let finir!: (r: Response) => void;
+  const source = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finir = resolve;
+        }),
+    )
+    .mockResolvedValueOnce(
+      Response.json(
+        {
+          compte: 3,
+          revision_compte: 5,
+          decision: { ...acceptee, etat: "refuse" },
+        },
+        { status: 409 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        compte: 3,
+        revision_compte: 6,
+        decision: { ...acceptee, revision: 3 },
+      }),
+    );
+  const vue = ouvrir("attente", source);
+  expect(vue.getByRole("status").textContent).toBe(
+    "Chargement des expéditeurs…",
+  );
+  await waitFor(() => expect(source).toHaveBeenCalledTimes(1));
+  finir(catalogue([atelier]));
+  fireEvent.click(await vue.findByRole("button", { name: "Refuser" }));
+  const avis = within(await vue.findByRole("alert"));
+  fireEvent.click(avis.getByRole("button", { name: "Accepter" }));
+  await waitFor(() => expect(vue.queryByRole("alert")).toBeNull());
+  expect(JSON.parse(source.mock.lastCall?.[1].body)).toMatchObject({
+    decision: "accepte",
+    revision_attendue: 2,
+  });
+});

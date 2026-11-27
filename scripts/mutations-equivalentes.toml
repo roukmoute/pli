@@ -54,3 +54,13 @@ sha256 = "4048540733f184fbf82d94c49c52d3bd9812e15111e67b5384b507177df19345"
 sha256 = "14d4ac69bf9a89eff62f4393f3ba8542a53cc90f5a1a56046215a59d5ea3b384"
 ["web/src/courrier/position.ts".sites]
 "29:60 ?? -> ||" = "Array.find renvoie un bouton HTML ou undefined. Les deux opérateurs choisissent la même ligne de repli."
+
+["web/src/courrier/Tri.tsx"]
+sha256 = "9b5ed521bb5d99b89f382037ae5e48265e4df7e122ab00a0ef062f41461e96a8"
+["web/src/courrier/Tri.tsx".sites]
+"76:55 ?? -> ||" = "Le titre suivant est un élément h2, null ou undefined. Les deux opérateurs sélectionnent le même titre de repli."
+
+["web/src/sync/projection-tri.ts"]
+sha256 = "62181b91489a1149cd1787919fdeaf434e322b73317b20fbe6c29be24a7eaf1b"
+["web/src/sync/projection-tri.ts".sites]
+"24:15 < -> <=" = "Le retour sur égalité à la ligne précédente garantit que les deux identifiants diffèrent dans cette branche."

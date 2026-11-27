@@ -64,6 +64,7 @@ function LigneTri(props: {
   entree: Expediteur;
   tri: Tri;
   mode: ListeTri;
+  titre: () => HTMLHeadingElement;
   charger: (operation: () => Promise<void>) => void;
 }) {
   const derniere = () => props.entree.messages[0];
@@ -72,9 +73,8 @@ function LigneTri(props: {
   function avancer() {
     if (props.mode !== "attente") return;
     const titre =
-      article.nextElementSibling?.querySelector("h2") ??
-      article.closest("main")?.querySelector("h1");
-    titre?.focus({ preventScroll: true });
+      article.nextElementSibling?.querySelector("h2") ?? props.titre();
+    titre.focus({ preventScroll: true });
   }
   return (
     <article
@@ -140,6 +140,7 @@ function LigneTri(props: {
 }
 
 export default function EcranTri(props: { mode: ListeTri; tri: Tri }) {
+  let titre!: HTMLHeadingElement;
   const catalogue = props.tri[props.mode];
   type Lecture = { cle: string; operation: () => Promise<void> };
   const [erreur, signaler] = createSignal<Lecture>();
@@ -153,9 +154,9 @@ export default function EcranTri(props: { mode: ListeTri; tri: Tri }) {
     const e = catalogue.etat();
     return e.statut === "pret" && e.perime;
   };
-  const visibles = () => {
+  const visibles = (expediteurs: Expediteur[]) => {
     const actifs = new Set(props.tri.intentions().map((i) => i.entree.adresse));
-    return contenu()?.expediteurs.filter((e) => !actifs.has(e.adresse));
+    return expediteurs.filter((e) => !actifs.has(e.adresse));
   };
   const conflit = () => {
     const avis = props.tri.avis();
@@ -186,7 +187,7 @@ export default function EcranTri(props: { mode: ListeTri; tri: Tri }) {
     <main class={layout.defilement}>
       <div class={layout.colonne}>
         <header class={styles.entete}>
-          <h1 tabindex="-1">
+          <h1 ref={titre} tabindex="-1">
             {t(props.mode === "attente" ? "screener" : "screenHistory")}
           </h1>
           <a href="/reception">{t("inbox")}</a>
@@ -238,35 +239,42 @@ export default function EcranTri(props: { mode: ListeTri; tri: Tri }) {
             </Show>
           }
         >
-          <For
-            each={visibles()}
-            keyed={(e) => e.adresse}
-            fallback={
-              <p role="status" class={styles.vide}>
-                {t(props.mode === "attente" ? "noScreening" : "noDecisions")}
-              </p>
-            }
-          >
-            {(entree) => (
-              <LigneTri
-                entree={entree()}
-                mode={props.mode}
-                tri={props.tri}
-                charger={(f) => void charger(entree().adresse, f)}
-              />
-            )}
-          </For>
-          <Show when={contenu()?.suite}>
-            <button
-              type="button"
-              disabled={lectures().includes("suite")}
-              onClick={() =>
-                void charger("suite", () => props.tri.suite(props.mode))
-              }
-            >
-              {t("moreSenders")}
-            </button>
-          </Show>
+          {(page) => (
+            <>
+              <For
+                each={visibles(page().expediteurs)}
+                keyed={(e) => e.adresse}
+                fallback={
+                  <p role="status" class={styles.vide}>
+                    {t(
+                      props.mode === "attente" ? "noScreening" : "noDecisions",
+                    )}
+                  </p>
+                }
+              >
+                {(entree) => (
+                  <LigneTri
+                    entree={entree()}
+                    mode={props.mode}
+                    tri={props.tri}
+                    titre={() => titre}
+                    charger={(f) => void charger(entree().adresse, f)}
+                  />
+                )}
+              </For>
+              <Show when={page().suite}>
+                <button
+                  type="button"
+                  disabled={lectures().includes("suite")}
+                  onClick={() =>
+                    void charger("suite", () => props.tri.suite(props.mode))
+                  }
+                >
+                  {t("moreSenders")}
+                </button>
+              </Show>
+            </>
+          )}
         </Show>
       </div>
     </main>

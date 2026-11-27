@@ -50,6 +50,7 @@ function Dossier(props: { cache: CacheCourrier }) {
 function Barre(props: Props & { cache: CacheCourrier; children: JSX.Element }) {
   const [menu, ouvrirMenu] = createSignal(false);
   let declencheur!: HTMLButtonElement;
+  let compte!: HTMLDetailsElement;
   function fermerMenu(rendreFocus: boolean) {
     ouvrirMenu(false);
     if (rendreFocus)
@@ -103,7 +104,7 @@ function Barre(props: Props & { cache: CacheCourrier; children: JSX.Element }) {
           <Icone nom="menu" libelle={t("menu")} />
           {t("menu")}
         </button>
-        <details class={styles.compte}>
+        <details ref={compte} class={styles.compte}>
           <summary aria-label={props.adresse}>
             <span aria-hidden="true">
               <Avatar nom={props.adresse} />
@@ -113,9 +114,9 @@ function Barre(props: Props & { cache: CacheCourrier; children: JSX.Element }) {
           <div class={styles.actionsCompte}>
             <a
               href="/historique-du-tri"
-              onClick={(e) =>
-                e.currentTarget.closest("details")?.removeAttribute("open")
-              }
+              onClick={() => {
+                compte.open = false;
+              }}
             >
               {t("screenHistory")}
             </a>
