@@ -1,6 +1,9 @@
 .DEFAULT_GOAL := check
 .PHONY: dev lint build test check
 .PHONY: bench-up bench-down bench-seed test-integration
+.PHONY: recette-lecture
+
+PYTHON_RECETTE ?= $(shell command -p -v python3 || command -v python3)
 
 dev lint build: web/node_modules/.installed .env.example
 
@@ -35,6 +38,10 @@ bench-seed:
 
 test-integration:
 	bash bench/test-integration.sh
+
+recette-lecture:
+	@cargo build --manifest-path server/Cargo.toml --locked --release --bin webmail-server --target-dir "$${CARGO_TARGET_DIR:-server/target}"
+	@"$(PYTHON_RECETTE)" -B bench/recette_lecture.py "$${CARGO_TARGET_DIR:-server/target}/release/webmail-server"
 
 web/node_modules/.installed: web/package.json web/package-lock.json
 	npm --prefix web ci
