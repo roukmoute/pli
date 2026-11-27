@@ -70,6 +70,14 @@
   height: clamp(12rem, 32vh, 24rem);
   border: 0;
 }
+.corps[data-court="true"] {
+  height: 5rem;
+}
+@media (max-width: 40rem) {
+  .colonne {
+    padding-block-end: calc(5rem + env(safe-area-inset-bottom));
+  }
+}
 .pieces {
   padding: 0;
   list-style: none;

@@ -84,6 +84,28 @@ it("annonce le chargement du fil puis distingue un échec de lecture et une boî
 });
 
 it.each([
+  { longueur: 180, images: false, court: true },
+  { longueur: 181, images: false, court: false },
+  { longueur: 50, images: true, court: false },
+])(
+  "adapte la hauteur d’une lettre de $longueur caractères avec images=$images",
+  async ({ longueur, images, court }) => {
+    const { vue } = afficher(racine(plan), (chemin) =>
+      chemin.startsWith("/threads/")
+        ? Response.json([entete("3", "Noa", "Cadre")])
+        : corps("", {
+            html: "a".repeat(longueur),
+            images: images
+              ? [{ type: "distante", url: "https://exemple.test/photo" }]
+              : [],
+          }),
+    );
+    const cadre = await vue.findByTitle("Contenu du message");
+    expect(cadre.getAttribute("data-court")).toBe(String(court));
+  },
+);
+
+it.each([
   { haut: 10, deplacement: -50 },
   { haut: 60, deplacement: null },
   { haut: 170, deplacement: null },

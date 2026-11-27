@@ -63,6 +63,12 @@ function Rendu(props: { id: string; contenu: Contenu }) {
         {(document) => (
           <iframe
             class={styles.corps}
+            data-court={
+              props.contenu.images.length === 0 &&
+              props.contenu.html.length <= 180
+                ? "true"
+                : "false"
+            }
             title={t("body")}
             sandbox=""
             referrerpolicy="no-referrer"
