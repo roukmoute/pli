@@ -1,0 +1,64 @@
+:root {
+  color: #25243a;
+  background: #f5f5fa;
+  font-family: Inter, system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 38rem;
+  margin: clamp(2rem, 10vh, 7rem) auto;
+  padding: 0 1.25rem;
+}
+
+.brand {
+  margin: 0 0 1rem;
+  color: #403693;
+  font-size: 2.5rem;
+  letter-spacing: -0.06em;
+}
+
+.panel {
+  padding: clamp(1.25rem, 5vw, 2.25rem);
+  border: 1px solid #dddce7;
+  border-radius: 1rem;
+  background: white;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.panel p {
+  margin: 0.75rem 0 0;
+}
+
+.available {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.available code {
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.45rem;
+  color: #11624f;
+  background: #e2f5ed;
+}
+
+.panel button {
+  margin-top: 1rem;
+  padding: 0.55rem 1rem;
+  border: 0;
+  border-radius: 0.45rem;
+  color: white;
+  background: #443898;
+  font: inherit;
+  cursor: pointer;
+}
