@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::{Error, Example};
 mod folders;
+mod pages;
 mod privacy;
 mod profiles;
 mod screener;
@@ -35,6 +36,7 @@ pub(crate) struct World {
     session: sessions::SessionSteps,
     pub(crate) restart: Option<tokio::sync::mpsc::Sender<crate::runtime::Restart>>,
     initial_marker: Option<(u32, u32)>,
+    page_precedente: Vec<String>,
     screener_bench: Option<screener::Bench>,
     pub(crate) recordings: Option<(PathBuf, PathBuf)>,
 }
@@ -53,6 +55,7 @@ impl World {
             session: Default::default(),
             restart: None,
             initial_marker: None,
+            page_precedente: Vec::new(),
             screener_bench: None,
             recordings: None,
         })
@@ -98,6 +101,7 @@ impl World {
             && !self.session_step(text, example).await?
             && !self.folder_step(text, example).await?
             && !self.screener_step(text, example).await?
+            && !self.page_step(text, example).await?
         {
             self.profile_step(text, example).await?;
         }

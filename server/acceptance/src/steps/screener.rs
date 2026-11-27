@@ -20,6 +20,10 @@ pub(super) struct Bench {
 }
 
 impl Bench {
+    pub(super) async fn attendre(&mut self, attendu: &str) -> Result<(), Problem> {
+        expect(event(&mut self.events).await?.as_str(), attendu)
+    }
+
     async fn start(command: &mut Command) -> Result<(Self, u16), Problem> {
         let mut relay = command
             .kill_on_drop(true)
@@ -70,12 +74,13 @@ async fn event(events: &mut Lines<BufReader<ChildStdout>>) -> Result<String, Pro
 }
 
 impl World {
-    async fn attach_test_mailbox(&mut self) -> Result<(), Problem> {
+    pub(super) async fn attach_test_mailbox(&mut self, options: &[&str]) -> Result<(), Problem> {
         let (dir, _) = self
             .recordings
             .as_ref()
             .ok_or_else(|| Problem::infra("Base de recette absente."))?;
-        let (bench, port) = Bench::start(Command::new("python3").arg(FIXTURE).arg(dir)).await?;
+        let (bench, port) =
+            Bench::start(Command::new("python3").arg(FIXTURE).arg(dir).args(options)).await?;
         self.connect_bench(bench, port).await
     }
 
@@ -101,7 +106,7 @@ impl World {
             .screener_bench
             .as_mut()
             .ok_or_else(|| Problem::infra("Banc de tri absent."))?;
-        expect(event(&mut bench.events).await?.as_str(), "livré")?;
+        bench.attendre("livré").await?;
         timeout(WAIT, async {
             loop {
                 self.read_screener().await?;
@@ -144,7 +149,7 @@ impl World {
     ) -> Result<bool, Problem> {
         match text {
             "une boîte contenant deux anciennes lettres est rattachée" => {
-                self.attach_test_mailbox().await?
+                self.attach_test_mailbox(&[]).await?
             }
             "deux nouvelles lettres du même expéditeur arrivent pendant la lecture du premier lot" => {
                 self.wait_for_delivery().await?
@@ -281,7 +286,7 @@ mod tests {
         let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
         let address = listener.local_addr().unwrap();
         let mut world = World::new(address).unwrap();
-        assert!(world.attach_test_mailbox().await.is_err());
+        assert!(world.attach_test_mailbox(&[]).await.is_err());
         world.recordings = Some((dir.path().into(), dir.path().join("log")));
         let (sender, mut restart) = tokio::sync::mpsc::channel(1);
         world.restart = Some(sender);

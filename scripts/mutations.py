@@ -16,6 +16,7 @@ def commande_integration(chemin):
         return "cargo test --manifest-path server/Cargo.toml --locked -p webmail-server --tests -- --include-ignored"
     if chemin.as_posix() in {
         "server/acceptance/src/steps/folders.rs",
+        "server/acceptance/src/steps/pages.rs",
         "server/acceptance/src/steps/screener.rs",
     }:
         return (

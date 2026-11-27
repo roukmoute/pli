@@ -58,9 +58,10 @@ async def forward_commands(reader, writer):
         await writer.drain()
 
 
-async def serve(directory):
+async def serve(directory, pages=False):
     address = f"tri-{uuid4().hex}@recette.test"
-    deliver(address, ["Archive A", "Archive B"])
+    subjects = [f"Archive {uid}" for uid in range(1, 52)] if pages else ["Archive A", "Archive B"]
+    deliver(address, subjects)
     key, cert = (directory / name for name in ("banc.key", "banc.pem"))
     subprocess.run(
         ["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
@@ -77,7 +78,7 @@ async def serve(directory):
         while line := await reader.readline():
             if re.match(rb"^\* \d+ FETCH \(", line):
                 fetched += 1
-                if fetched == 2 and not paused:
+                if not pages and fetched == 2 and not paused:
                     paused = True
                     await asyncio.to_thread(deliver, address, ["Arrivée A", "Arrivée B"])
                     print("livré", flush=True)
@@ -86,9 +87,21 @@ async def serve(directory):
             writer.write(line)
             await writer.drain()
 
+    async def page_commands(reader, writer):
+        nonlocal paused
+        while line := await reader.readline():
+            if not paused and re.search(rb"\bUID FETCH 1 \(UID ENVELOPE\b", line, re.I):
+                # Le lot de 50 en-têtes est validé. Retenir le dernier UID jusqu’à la reprise.
+                paused = True
+                print("lot suspendu", flush=True)
+                await asyncio.Future()
+            writer.write(line)
+            await writer.drain()
+
     async def relay(client, downstream):
         remote, upstream = await asyncio.open_connection(HOST, IMAPS, ssl=tls_client())
-        tasks = [asyncio.create_task(forward_commands(client, upstream)),
+        commands = page_commands if pages else forward_commands
+        tasks = [asyncio.create_task(commands(client, upstream)),
                  asyncio.create_task(replies(remote, downstream))]
         try:
             await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -108,4 +121,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "--unread":
         print(unread(sys.argv[2]))
     else:
-        asyncio.run(serve(Path(sys.argv[1])))
+        asyncio.run(serve(Path(sys.argv[1]), "--pages" in sys.argv[2:]))
