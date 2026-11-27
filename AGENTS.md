@@ -1,5 +1,15 @@
 # Consignes du dépôt Pli
 
+## GitHub : toujours passer par gh
+
+Avant toute interaction avec GitHub, vérifiez la connexion avec `gh auth status`. En cas d’échec, arrêtez-vous et signalez-le dans le journal de la carte. La commande `gh auth login` et tout changement de compte sont interdits.
+
+Passez par `gh` pour toute interaction avec GitHub. Gérez les Releases avec `gh release` et les issues avec `gh issue`. Consultez le dépôt distant avec `gh repo view` et lancez les workflows manuels avec `gh workflow run`. Pour toute autre opération sur l’API GitHub, utilisez `gh api`. Les appels directs avec `curl` ou tout autre client HTTP sont interdits. N’écrivez jamais de jeton GitHub dans un fichier ou dans une variable versionnée.
+
+Gardez `origin` en HTTPS (`https://github.com/roukmoute/pli.git`). Les remotes SSH sont interdits. Configurez Git avec `gh auth setup-git` pour que `git pull --rebase` et `git push` s’authentifient via `gh`.
+
+Après chaque push, listez les exécutions de CI du commit poussé avec `gh run list --commit <sha>`. Suivez chacune avec `gh run watch <id> --exit-status`. En cas d’échec, corrigez la cause et vérifiez la CI du correctif avant de rendre la carte. Si le dépôt n’a aucun workflow ou si aucun ne se déclenche pour ce commit, notez-le dans le journal de la carte et poursuivez.
+
 ## Commits, push et versions
 
 ### Préparer les commits
