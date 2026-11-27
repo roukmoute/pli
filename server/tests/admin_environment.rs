@@ -34,6 +34,7 @@ impl TestService {
                 .env("WEBMAIL_ADMIN_TOKEN", token)
                 .env("WEBMAIL_ALLOW_TEST_PROFILE", flag)
                 .env("RUST_LOG", "trace")
+                .env("NO_COLOR", "1")
                 .env("WEBMAIL_SECRET_KEY", hex::encode([42; 32]))
                 .env("WEBMAIL_SESSION_TTL_SECONDS", "300")
                 .stdout(Stdio::piped())
