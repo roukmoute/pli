@@ -456,6 +456,20 @@
   .colonne {
     padding-inline: 0.85rem;
   }
+  .selection {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.5rem;
+  }
+  .boutonLot {
+    align-self: stretch;
+  }
+  .selection [role="status"] {
+    text-align: end;
+  }
+  .selection [role="alert"] {
+    grid-column: 1 / -1;
+  }
   .section h2 {
     padding-inline: 0.85rem;
   }
