@@ -58,14 +58,13 @@ async function verifier(page, taille) {
   const fil = page.locator("[data-fil]").nth(2);
   await fil.waitFor();
   await fil.focus();
-  const avant = await fil.evaluate((el) => ({
-    id: el.dataset.fil,
-    section: el.closest("section").dataset.section,
-    scroll: el.closest("main").scrollTop,
-  }));
+  if (captures)
+    await page.locator("main").evaluate((main) => {
+      main.scrollTop = 0;
+    });
   await capture(page, "reception", taille);
   await page.keyboard.press("h");
-  let menu = page.getByRole("dialog", { name: "Menu" });
+  const menu = page.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("link", { name: "Atelier", exact: true }).waitFor();
   assert(
     await menu
@@ -78,6 +77,28 @@ async function verifier(page, taille) {
   await page.keyboard.press("Escape");
   const declencheur = page.getByRole("button", { name: "Menu", exact: true });
   assert(await declencheur.evaluate((el) => el === document.activeElement));
+  await fil.focus();
+  const avant = await fil.evaluate(async (el) => {
+    const zone = el.closest("main");
+    zone.scrollTop = 164;
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    return {
+      id: el.dataset.fil,
+      section: el.closest("section").dataset.section,
+      scroll: zone.scrollTop,
+    };
+  });
+  assert(avant.scroll > 0, "La liste doit avoir défilé avant le départ.");
+  for (const commande of ["menu", "historique"]) {
+    await verifierRetour(page, avant, commande);
+  }
+}
+
+async function verifierRetour(page, avant, commande) {
+  const declencheur = page.getByRole("button", { name: "Menu", exact: true });
+  const menu = page.getByRole("dialog", { name: "Menu" });
   await declencheur.click();
   await menu.getByRole("link", { name: "Atelier", exact: true }).click();
   await page.getByRole("heading", { name: "Atelier", exact: true }).waitFor();
@@ -97,6 +118,9 @@ async function verifier(page, taille) {
     await barrage;
     try {
       await route.continue();
+      const reponse = await route.request().response();
+      assert(reponse?.ok(), "L’actualisation de la Réception doit réussir.");
+      await reponse.finished();
       liberee.resolve();
     } catch (erreur) {
       liberee.reject(erreur);
@@ -104,9 +128,12 @@ async function verifier(page, taille) {
   };
   await page.route(chemin, retenir);
   try {
-    await declencheur.click();
-    menu = page.getByRole("dialog", { name: "Menu" });
-    await menu.getByRole("link", { name: "Réception", exact: true }).click();
+    if (commande === "historique") {
+      await page.goBack();
+    } else {
+      await declencheur.click();
+      await menu.getByRole("link", { name: "Réception", exact: true }).click();
+    }
     await page.waitForFunction(
       (id) => document.activeElement?.getAttribute("data-fil") === id,
       avant.id,
@@ -117,7 +144,10 @@ async function verifier(page, taille) {
       deborde: document.documentElement.scrollWidth > innerWidth,
     }));
     assert.equal(apres.section, avant.section);
-    assert(Math.abs(apres.scroll - avant.scroll) <= 1);
+    assert(
+      Math.abs(apres.scroll - avant.scroll) <= 1,
+      `Retour par ${commande} à ${apres.scroll} px au lieu de ${avant.scroll} px.`,
+    );
     assert.equal(apres.deborde, false);
     const delai = setTimeout(
       () => arrivee.reject(new Error("Actualisation HTTP absente.")),

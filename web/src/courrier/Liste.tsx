@@ -103,8 +103,10 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
 
   onSettled(() => {
     restaurerPosition(zone, entree.repere);
+    window.addEventListener("resize", memoriserDefilement);
     void props.courrier.chargerVue(props.vue);
     return () => {
+      window.removeEventListener("resize", memoriserDefilement);
       if (image !== undefined) cancelAnimationFrame(image);
     };
   });
