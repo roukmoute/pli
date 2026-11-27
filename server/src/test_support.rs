@@ -36,6 +36,7 @@ impl TestApp {
             Default::default(),
             crate::session::SessionConfig::parse(None, "60").unwrap(),
         )
+        .unwrap()
     }
 }
 

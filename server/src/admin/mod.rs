@@ -3,7 +3,7 @@ mod profiles;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use diagnostic::{LoginFailure, login_mailbox};
+pub(crate) use diagnostic::{ImapSession, LoginFailure, login_mailbox};
 pub(crate) use profiles::{Server, for_domain};
 
 use std::{env, sync::Arc};

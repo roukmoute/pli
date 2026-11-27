@@ -22,9 +22,10 @@ use crate::{
     Error, admin,
     db::Database,
     http::{ApiError, api_error},
+    sync::Synchronizer,
 };
-pub(crate) use secret::SessionConfig;
 use secret::Token;
+pub(crate) use secret::{SessionConfig, decrypt};
 pub(crate) use store::CompteAuthentifie;
 use store::Mailbox;
 
@@ -34,17 +35,20 @@ struct Sessions {
     db: Arc<Database>,
     config: SessionConfig,
     allow_test: bool,
+    sync: Synchronizer,
 }
 
 pub(crate) fn router(
     db: Arc<Database>,
     config: SessionConfig,
     allow_test: bool,
+    sync: Synchronizer,
 ) -> Router<Arc<Database>> {
     let open = post(open).with_state(Arc::new(Sessions {
         db,
         config,
         allow_test,
+        sync,
     }));
     Router::new().route("/v1/session", open.get(current).delete(close))
 }
@@ -141,13 +145,23 @@ async fn open(
         .profile
         .validate(sessions.allow_test)
         .map_err(|_| unavailable())?;
-    admin::login_mailbox(&server.profile, &mailbox.address, &input.password)
+    let imap = admin::login_mailbox(&server.profile, &mailbox.address, &input.password)
         .await
         .map_err(|failure| match failure {
             admin::LoginFailure::InvalidCredentials => invalid(),
             admin::LoginFailure::Unavailable => unavailable(),
         })?;
     let encrypted = secret::encrypt(key, server.id, &mailbox.address, input.password)
+        .map_err(|_| unavailable())?;
+    let address = mailbox.address.clone();
+    let (account_id, has_marker) = database(&sessions.db, move |db| {
+        store::attach(&mut *db.writer()?, &mailbox, &server, &encrypted)
+    })
+    .await?;
+    sessions
+        .sync
+        .on_login(account_id, imap, has_marker)
+        .await
         .map_err(|_| unavailable())?;
     let token = Token::generate().map_err(|_| unavailable())?;
     let ttl = sessions.config.ttl.get();
@@ -156,9 +170,8 @@ async fn open(
     let account = database(&sessions.db, move |db| {
         store::open(
             &mut *db.writer()?,
-            mailbox,
-            &server,
-            &encrypted,
+            account_id,
+            address,
             &token,
             previous,
             ttl,

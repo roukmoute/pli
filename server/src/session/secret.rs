@@ -66,6 +66,22 @@ pub(super) fn encrypt(
     Ok(stored)
 }
 
+pub(crate) fn decrypt(
+    key: &LessSafeKey,
+    profile: i64,
+    address: &str,
+    stored: &mut [u8],
+) -> Result<String, Error> {
+    let (nonce, ciphertext) = stored
+        .split_at_mut_checked(ring::aead::NONCE_LEN)
+        .ok_or("Secret de messagerie incomplet.")?;
+    let nonce = Nonce::try_assume_unique_for_key(nonce).map_err(|_| "Nonce invalide.")?;
+    let plain = key
+        .open_in_place(nonce, Aad::from(format!("{profile}:{address}")), ciphertext)
+        .map_err(|_| "Secret de messagerie illisible.")?;
+    Ok(std::str::from_utf8(plain)?.to_owned())
+}
+
 pub(super) struct Token([u8; 32]);
 
 impl Token {

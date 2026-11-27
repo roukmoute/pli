@@ -18,6 +18,11 @@ pub(super) struct SessionSteps {
 }
 
 impl SessionSteps {
+    pub(super) fn alice_id(&self) -> Result<i64, Problem> {
+        self.alice
+            .ok_or_else(|| Problem::Step("Compte d’Alice absent.".into()))
+    }
+
     pub fn record_cookie(&mut self, response: &reqwest::Response) {
         if let Some(pair) = response
             .headers()
@@ -86,7 +91,16 @@ impl World {
         Ok(())
     }
 
-    async fn read_session(&mut self, url: String, cookie: Option<String>) -> Result<(), Problem> {
+    pub(super) async fn read_current(&mut self, url: String) -> Result<(), Problem> {
+        self.read_with_cookie(url, self.session.cookie.clone())
+            .await
+    }
+
+    async fn read_with_cookie(
+        &mut self,
+        url: String,
+        cookie: Option<String>,
+    ) -> Result<(), Problem> {
         let cookie = cookie.ok_or_else(|| Problem::Step("Aucun cookie de recette.".into()))?;
         self.send(self.client.get(url).header(COOKIE, cookie)).await
     }
@@ -134,29 +148,19 @@ impl World {
                 )
                 .await?;
             }
-            "je consulte ma session" => {
-                self.read_session(self.session_url(), self.session.cookie.clone())
-                    .await?
-            }
+            "je consulte ma session" => self.read_current(self.session_url()).await?,
             "je consulte ma session avec mon ancien cookie" => {
-                self.read_session(self.session_url(), self.session.closed_cookie.clone())
+                self.read_with_cookie(self.session_url(), self.session.closed_cookie.clone())
                     .await?
             }
             "je consulte ma session après son expiration" => {
                 self.wait_for_expiry().await?;
-                self.read_session(self.session_url(), self.session.cookie.clone())
-                    .await?;
+                self.read_current(self.session_url()).await?;
             }
             "Bob demande la session en indiquant le compte d’Alice" => {
-                let alice = self
-                    .session
-                    .alice
-                    .ok_or_else(|| Problem::Step("Compte d’Alice absent.".into()))?;
-                self.read_session(
-                    format!("{}?account_id={alice}", self.session_url()),
-                    self.session.cookie.clone(),
-                )
-                .await?;
+                let alice = self.session.alice_id()?;
+                self.read_current(format!("{}?account_id={alice}", self.session_url()))
+                    .await?;
             }
             _ => return self.session_assertion(text, row),
         }
@@ -203,22 +207,33 @@ mod tests {
             http::{HeaderMap, Uri},
             routing::get,
         };
-        let api = Router::new().route("/api/v1/session", get(async |headers: HeaderMap, uri: Uri| {
-            Json(json!({"cookie":headers[COOKIE].to_str().unwrap(), "query":uri.query(), "expires_at":1}))
-        }).post(async |body: Json<serde_json::Value>| {
-            let address = body["address"].as_str().unwrap();
-            let password = body["password"].as_str().unwrap();
-            let (cookie,id) = match (address,password) {
-                ("alice@recette.test","alice-test") => ("sample=alice; Path=/",42),
-                ("bob@recette.test","bob-test") => ("sample=bob; Path=/",84),
-                ("alice@recette.test","secret-incorrect") => ("sample=; Path=/",0),
-                _ => panic!("Identifiants fictifs inattendus"),
-            };
-            ([(SET_COOKIE,cookie)], Json(json!({"account_id":id, "expires_at":1})))
-        }).delete(async |headers: HeaderMap| {
-            assert_eq!(headers[COOKIE],"sample=bob");
-            ([(SET_COOKIE,"sample=; Max-Age=0")], StatusCode::NO_CONTENT)
-        }));
+        let current = async |headers: HeaderMap, uri: Uri| {
+            Json(
+                json!({"cookie":headers[COOKIE].to_str().unwrap(), "query":uri.query(), "expires_at":1}),
+            )
+        };
+        let api = Router::new().route("/api/v1/folders", get(current)).route(
+            "/api/v1/session",
+            get(current)
+                .post(async |body: Json<serde_json::Value>| {
+                    let address = body["address"].as_str().unwrap();
+                    let password = body["password"].as_str().unwrap();
+                    let (cookie, id) = match (address, password) {
+                        ("alice@recette.test", "alice-test") => ("sample=alice; Path=/", 42),
+                        ("bob@recette.test", "bob-test") => ("sample=bob; Path=/", 84),
+                        ("alice@recette.test", "secret-incorrect") => ("sample=; Path=/", 0),
+                        _ => panic!("Identifiants fictifs inattendus"),
+                    };
+                    (
+                        [(SET_COOKIE, cookie)],
+                        Json(json!({"account_id":id, "expires_at":1})),
+                    )
+                })
+                .delete(async |headers: HeaderMap| {
+                    assert_eq!(headers[COOKIE], "sample=bob");
+                    ([(SET_COOKIE, "sample=; Max-Age=0")], StatusCode::NO_CONTENT)
+                }),
+        );
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let mut world = World::new(listener.local_addr().unwrap()).unwrap();
         tokio::select! {
@@ -232,6 +247,12 @@ mod tests {
                 assert_eq!(world.json().unwrap()["cookie"],"sample=alice");
                 world.step("Alice ouvre sa session",&row).await.unwrap();
                 world.step("Bob ouvre sa propre session",&row).await.unwrap();
+                world.step("je consulte les dossiers de ma boîte",&row).await.unwrap();
+                assert_eq!(world.json().unwrap()["cookie"],"sample=bob");
+                assert!(world.json().unwrap()["query"].is_null());
+                world.step("Bob consulte les dossiers en indiquant le compte d’Alice",&row).await.unwrap();
+                assert_eq!(world.json().unwrap()["cookie"],"sample=bob");
+                assert_eq!(world.json().unwrap()["query"],"account_id=42");
                 world.step("Bob demande la session en indiquant le compte d’Alice",&row).await.unwrap();
                 assert_eq!(world.json().unwrap()["query"],"account_id=42");
                 assert_eq!(world.json().unwrap()["cookie"],"sample=bob");

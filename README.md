@@ -63,7 +63,7 @@ Sur `/admin`, ouvrez l’administration puis choisissez **Ajouter un serveur**. 
 
 L’API d’administration utilise l’en-tête `Authorization: Bearer <jeton>`. `GET /api/admin/v1/servers` renvoie les serveurs et les préréglages. `POST /api/admin/v1/servers/test` teste un candidat. `POST /api/admin/v1/servers` le crée et `PUT /api/admin/v1/servers/{id}` le modifie. Ces trois opérations reçoivent un objet JSON contenant `profile` (même structure qu’un préréglage) et `credentials` (champs `username` et `password`). Une sauvegarde refusée renvoie le diagnostic avec le statut HTTP 422 et conserve le profil en service.
 
-Les scénarios de `scripts/acceptation.sh` démarrent un GreenMail Docker temporaire et attendent son démarrage avec OpenSSL. Pour réutiliser le banc du projet, exportez ses deux ports dans `PLI_APS_IMAPS_PORT` et `PLI_APS_SMTPS_PORT`. Les scénarios utilisent les boîtes fictives d’Alice et de Bob du [banc GreenMail](bench/README.md).
+Les scénarios de `scripts/acceptation.sh` démarrent un GreenMail Docker temporaire avec le jeu `base`. Pour réutiliser un banc déjà peuplé avec ce jeu, exportez ses deux ports dans `PLI_APS_IMAPS_PORT` et `PLI_APS_SMTPS_PORT`. Les scénarios utilisent les boîtes fictives d’Alice et de Bob du [banc GreenMail](bench/README.md).
 
 Make génère `.env.example` à partir de `config/example.env`. La commande `make .env.example` permet aussi de le préparer seul. Pour utiliser vos valeurs dans le terminal courant, copiez le modèle dans `.env`, modifiez-le, puis exportez ses variables avant de lancer le service.
 
@@ -82,6 +82,12 @@ Sur `/admin`, associez le domaine des adresses au profil du fournisseur. Pour un
 | `POST` | Reçoit `{"address":"alice@recette.test","password":"alice-test"}` (exemple du banc). Renvoie `account_id`, `address` et `expires_at` (secondes Unix) et pose le cookie de session. Un refus d’identification donne `401 identifiants_invalides`. Une panne IMAP, TLS ou de stockage donne `503 service_indisponible`. |
 | `GET` | Renvoie la boîte attachée au cookie. Une session absente, expirée ou fermée donne `401 session_expiree`. |
 | `DELETE` | Révoque la session en base, efface le cookie et renvoie `204`. |
+
+Au premier rattachement, la session s’ouvre une fois les dossiers et le repère INBOX enregistrés ensemble. Le repère contient la génération IMAP et le prochain UID relevés avant l’import. Chaque compte conserve ce repère lors des connexions suivantes et des redémarrages.
+
+Lorsque le serveur annonce `SPECIAL-USE`, ses attributs déterminent les rôles des dossiers. Sinon, le synchroniseur reconnaît les libellés français, allemands et anglais à la racine ou directement sous INBOX. Un sous-dossier personnel tel que `Atelier/Archives` garde son rôle vide.
+
+`GET /api/v1/folders` renvoie les dossiers du compte identifié par le cookie, dans le tableau `folders`. Chaque entrée contient `id`, `path`, `delimiter`, `hidden` et `role`. Les rôles possibles sont `inbox`, `sent`, `drafts`, `junk`, `trash` et `archive`. Un dossier personnel a le rôle `null`.
 
 Le cookie est propre à l’hôte, `Secure`, `HttpOnly` et `SameSite=Strict`. Servez Pli en HTTPS en déploiement et utilisez l’adresse de bouclage en développement. SQLite conserve l’empreinte SHA-256 du jeton et le secret IMAP chiffré en AES-256-GCM. Le chiffrement associe le secret à l’adresse et au profil serveur. Sauvegardez la clé séparément de la base pour pouvoir relire les secrets après restauration.
 

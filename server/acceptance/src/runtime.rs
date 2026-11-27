@@ -1,12 +1,32 @@
 use std::{env, path::Path};
 
-use tokio::net::TcpListener;
+use tokio::{
+    net::TcpListener,
+    sync::{mpsc, oneshot},
+};
 
 use crate::{
     Error, Example, Feature, IR_ENV, Step,
     generator::Entrypoint,
     steps::{Problem, World},
 };
+
+pub(crate) type Restart = oneshot::Sender<std::net::SocketAddr>;
+
+async fn serve(
+    mut listener: TcpListener,
+    directory: &Path,
+    mut restarts: mpsc::Receiver<Restart>,
+) -> Result<(), Error> {
+    loop {
+        let reply = tokio::select! {
+            result = webmail_server::serve_with_admin(listener, directory, crate::steps::admin_config()) => return result,
+            Some(reply) = restarts.recv() => reply,
+        };
+        listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let _ = reply.send(listener.local_addr()?);
+    }
+}
 
 async fn run_case<'a>(
     steps: impl Iterator<Item = &'a Step>,
@@ -18,6 +38,8 @@ async fn run_case<'a>(
         .await
         .map_err(Problem::infra)?;
     let mut world = World::new(listener.local_addr().map_err(Problem::infra)?)?;
+    let (restart, restarts) = mpsc::channel(1);
+    world.restart = Some(restart);
     world.recordings = journal.map(|log| (directory.path().to_owned(), log.to_owned()));
     let scenario = async {
         for step in steps {
@@ -29,7 +51,7 @@ async fn run_case<'a>(
         Ok(())
     };
     tokio::select! {
-        result = webmail_server::serve_with_admin(listener, directory.path(), crate::steps::admin_config()) => {
+        result = serve(listener, directory.path(), restarts) => {
             Err(Problem::infra(result.err().unwrap_or_else(|| "Le service s’est arrêté".into())))
         }
         result = scenario => result,
@@ -70,6 +92,33 @@ pub async fn run(entry: &Path, journal: &Path) -> Result<bool, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn a_restart_serves_the_same_database_on_an_ephemeral_loopback_port() {
+        let dir = tempfile::tempdir().unwrap();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let (restart, restarts) = mpsc::channel(1);
+        let address = listener.local_addr().unwrap();
+        tokio::select! {
+            _ = serve(listener, dir.path(), restarts) => panic!("Arrêt du service de recette"),
+            () = async {
+                let mut world = World::new(address).unwrap();
+                world.step("je consulte la disponibilité du webmail", &Example::new()).await.unwrap();
+                let db = rusqlite::Connection::open(dir.path().join("webmail.db")).unwrap();
+                db.execute_batch("INSERT INTO server_profiles
+                    (name,imap_host,imap_port,imap_tls,smtp_host,smtp_port,smtp_tls,domains,active,local_test)
+                    VALUES ('Banc','127.0.0.1',3993,'implicit','127.0.0.1',3465,'implicit','[]',0,1)").unwrap();
+                let (reply, ready) = oneshot::channel();
+                restart.send(reply).await.unwrap();
+                let address = ready.await.unwrap();
+                assert!(address.ip().is_loopback());
+                assert!(address.port() > 1023);
+                let mut restarted = World::new(address).unwrap();
+                restarted.step("je consulte les serveurs de messagerie", &Example::new()).await.unwrap();
+                restarted.step("le nombre de serveurs configurés est <nombre>", &Example::from([("nombre".into(), "1".into())])).await.unwrap();
+            } => {}
+        }
+    }
 
     fn steps(lines: &[&str]) -> Vec<Step> {
         lines

@@ -188,6 +188,52 @@ async fn greenmail_sessions_isolate_accounts_and_keep_credentials_out_of_storage
     assert_ne!(as_bob["account_id"], alice_id);
     assert_eq!(as_bob["address"], "bob@recette.test");
     assert!(!as_bob.to_string().contains("alice"));
+    let folders_url = format!("{}/api/v1/folders?account_id={alice_id}", service.base);
+    let alice_folders: Value = client
+        .get(&folders_url)
+        .header("cookie", &alice_cookie)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let folders = alice_folders["folders"]
+        .as_array()
+        .ok_or("Dossiers absents")?;
+    for (path, role) in [
+        ("INBOX", Some("inbox")),
+        ("Gesendet", Some("sent")),
+        ("Papierkorb", Some("trash")),
+        ("Atelier", None),
+    ] {
+        let folder = folders
+            .iter()
+            .find(|folder| folder["path"] == path)
+            .ok_or("Dossier du banc absent")?;
+        assert_eq!(folder.get("role"), Some(&json!(role)));
+    }
+    let bob_folders: Value = client
+        .get(&folders_url)
+        .header("cookie", &bob_cookie)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let folders = bob_folders["folders"]
+        .as_array()
+        .ok_or("Dossiers de Bob absents")?;
+    assert_eq!(folders.len(), 1);
+    assert_eq!(folders[0]["path"], "INBOX");
+    assert_ne!(
+        folders[0]["id"],
+        alice_folders["folders"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["path"] == "INBOX")
+            .unwrap()["id"]
+    );
     let logout = client
         .delete(&url)
         .header("cookie", &alice_cookie)

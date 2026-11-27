@@ -30,21 +30,17 @@ WEBMAIL_SECRET_KEY=$(openssl rand -hex 32)
 export WEBMAIL_SESSION_TTL_SECONDS=3
 mkdir -p build/acceptance/{ir,dry}
 
-# Un seul banc sans messages pour la suite et ses mutations. Les ports publiés
+# Un seul jeu de base pour la suite et ses mutations. Les ports publiés
 # sont attribués par Docker, y compris si plusieurs suites tournent en parallèle.
 if [[ -z ${PLI_APS_IMAPS_PORT:-} && -z ${PLI_APS_SMTPS_PORT:-} ]]; then
-    banc=$(docker run --rm -d -p 127.0.0.1::3993 -p 127.0.0.1::3465 \
-        -e 'GREENMAIL_OPTS=-Dgreenmail.setup.test.imaps -Dgreenmail.setup.test.smtps -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users.login=email -Dgreenmail.users=alice:alice-test@recette.test,bob:bob-test@recette.test' \
-        greenmail/standalone:2.1.15)
-    trap 'docker stop "$banc" >/dev/null' EXIT
-    adresse_imap=$(docker port "$banc" 3993/tcp)
-    adresse_smtp=$(docker port "$banc" 3465/tcp)
+    export COMPOSE_PROJECT_NAME="pli-acceptation-$$"
+    export PLI_BENCH_IMAP_PORT=0 PLI_BENCH_IMAPS_PORT=0 PLI_BENCH_SMTP_PORT=0 PLI_BENCH_SMTPS_PORT=0
+    compose=(docker compose -f bench/docker-compose.yml)
+    trap '"${compose[@]}" down' EXIT
+    python3 bench/seed.py base
+    adresse_imap=$("${compose[@]}" port greenmail 3993)
+    adresse_smtp=$("${compose[@]}" port greenmail 3465)
     export PLI_APS_IMAPS_PORT=${adresse_imap##*:} PLI_APS_SMTPS_PORT=${adresse_smtp##*:}
-    for tentative in {1..50}; do
-        if timeout 2 openssl s_client -brief -connect "$adresse_imap" </dev/null >/dev/null 2>&1 &&
-           timeout 2 openssl s_client -brief -connect "$adresse_smtp" </dev/null >/dev/null 2>&1; then break; fi
-        sleep 0.2
-    done
 fi
 
 for feature in "${features[@]}"; do

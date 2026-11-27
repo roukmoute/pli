@@ -4,6 +4,7 @@ use reqwest::{Client, RequestBuilder, StatusCode};
 use serde_json::Value;
 
 use crate::{Error, Example};
+mod folders;
 mod privacy;
 mod profiles;
 mod sessions;
@@ -31,6 +32,8 @@ pub(crate) struct World {
     client: Client,
     response: Option<(StatusCode, String)>,
     session: sessions::SessionSteps,
+    pub(crate) restart: Option<tokio::sync::mpsc::Sender<crate::runtime::Restart>>,
+    initial_marker: Option<(u32, u32)>,
     pub(crate) recordings: Option<(PathBuf, PathBuf)>,
 }
 
@@ -46,6 +49,8 @@ impl World {
             client,
             response: None,
             session: Default::default(),
+            restart: None,
+            initial_marker: None,
             recordings: None,
         })
     }
@@ -86,7 +91,10 @@ impl World {
                 .as_str()
                 .ok_or_else(|| Problem::Step("La réponse ne contient pas d’état textuel".into()))?;
             expect(state, example_value(example, key)?)?;
-        } else if !self.privacy_step(text, example)? && !self.session_step(text, example).await? {
+        } else if !self.privacy_step(text, example)?
+            && !self.session_step(text, example).await?
+            && !self.folder_step(text, example).await?
+        {
             self.profile_step(text, example).await?;
         }
         Ok(())

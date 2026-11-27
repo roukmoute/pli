@@ -22,6 +22,7 @@ fn configured(app: &TestApp, token: Option<&str>, local: bool) -> Router {
         AdminConfig::new(token.map(str::to_owned), local),
         crate::session::SessionConfig::parse(None, "60").unwrap(),
     )
+    .unwrap()
 }
 
 async fn call(

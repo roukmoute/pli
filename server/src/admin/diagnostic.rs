@@ -139,18 +139,19 @@ pub(crate) enum LoginFailure {
     Unavailable,
 }
 
+pub(crate) type ImapSession = async_imap::Session<TlsStream<TcpStream>>;
+
 async fn imap_login(
     stream: TlsStream<TcpStream>,
     mode: TlsMode,
     username: &str,
     password: &str,
-) -> async_imap::error::Result<()> {
+) -> async_imap::error::Result<ImapSession> {
     let mut client = ImapClient::new(stream);
     if mode == TlsMode::Implicit {
         imap_greeting(&mut client).await?;
     }
-    client.login(username, password).await.map_err(|(e, _)| e)?;
-    Ok(())
+    client.login(username, password).await.map_err(|(e, _)| e)
 }
 
 fn login_failure(error: async_imap::error::Error) -> LoginFailure {
@@ -176,7 +177,7 @@ pub(crate) async fn login_mailbox(
     profile: &Profile,
     address: &str,
     password: &str,
-) -> Result<(), LoginFailure> {
+) -> Result<ImapSession, LoginFailure> {
     let ep = &profile.imap;
     timeout(STEP_TIMEOUT, async {
         let tcp = TcpStream::connect((ep.host.as_str(), ep.port))

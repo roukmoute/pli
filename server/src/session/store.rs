@@ -59,21 +59,36 @@ fn save_account(
     )
 }
 
-pub(super) fn open(
+pub(super) fn attach(
     db: &mut Connection,
-    mailbox: Mailbox,
+    mailbox: &Mailbox,
     server: &admin::Server,
     encrypted: &[u8],
-    token: &Token,
-    previous: Option<Token>,
-    ttl: u32,
-) -> Result<CompteAuthentifie, Error> {
+) -> Result<(i64, bool), Error> {
     let tx = db.transaction()?;
     // Le profil peut avoir changé pendant l’aller-retour IMAP.
     if admin::for_domain(&tx, &mailbox.domain)?.as_ref() != Some(server) {
         return Err("Le profil a changé pendant la connexion.".into());
     }
     let account_id = save_account(&tx, &mailbox.address, server.id, encrypted)?;
+    let has_marker = tx.query_row(
+        "SELECT EXISTS (SELECT 1 FROM inbox_markers WHERE account_id=?1)",
+        [account_id],
+        |r| r.get(0),
+    )?;
+    tx.commit()?;
+    Ok((account_id, has_marker))
+}
+
+pub(super) fn open(
+    db: &mut Connection,
+    account_id: i64,
+    address: String,
+    token: &Token,
+    previous: Option<Token>,
+    ttl: u32,
+) -> Result<CompteAuthentifie, Error> {
+    let tx = db.transaction()?;
     if let Some(old) = previous {
         revoke(&tx, &old)?;
     }
@@ -87,7 +102,7 @@ pub(super) fn open(
     tx.commit()?;
     Ok(CompteAuthentifie {
         account_id,
-        address: mailbox.address,
+        address,
         expires_at,
     })
 }

@@ -1236,6 +1236,7 @@ dependencies = [
  "hex",
  "humantime",
  "reqwest",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
@@ -2320,6 +2321,7 @@ version = "0.1.0"
 dependencies = [
  "async-imap",
  "axum",
+ "encodify",
  "hex",
  "include_dir",
  "mail-send",

@@ -14,11 +14,22 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
 };
 
-use crate::{AdminConfig, Error, admin, db::Database, session};
+use crate::{AdminConfig, Error, admin, db::Database, session, sync};
 
-pub fn router(db: Arc<Database>, config: AdminConfig, sessions: session::SessionConfig) -> Router {
+pub fn router(
+    db: Arc<Database>,
+    config: AdminConfig,
+    sessions: session::SessionConfig,
+) -> Result<Router, Error> {
+    let sync = sync::Synchronizer::start(db.clone(), sessions.key.clone(), config.allow_test)?;
     let api = Router::new()
-        .merge(session::router(db.clone(), sessions, config.allow_test))
+        .merge(session::router(
+            db.clone(),
+            sessions,
+            config.allow_test,
+            sync,
+        ))
+        .route("/v1/folders", get(sync::folders))
         .nest("/admin/v1", admin::router(db.clone(), config))
         .route("/v1/health", get(health))
         .fallback(async || api_error(StatusCode::NOT_FOUND, "not_found", "Route API inconnue."))
@@ -39,7 +50,7 @@ pub fn router(db: Arc<Database>, config: AdminConfig, sessions: session::Session
         .route_service("/admin/", ServeFile::new("web/dist/index.html"))
         .fallback_service(ServeDir::new("web/dist"))
         .layer(middleware::from_fn(cache_static));
-    Router::new().nest("/api", api).fallback_service(files)
+    Ok(Router::new().nest("/api", api).fallback_service(files))
 }
 
 #[derive(Serialize)]

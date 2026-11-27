@@ -2,6 +2,7 @@ mod admin;
 mod db;
 mod http;
 mod session;
+mod sync;
 #[cfg(test)]
 mod test_support;
 
@@ -34,7 +35,8 @@ pub async fn serve_with_admin(
 ) -> Result<(), Error> {
     let sessions = session::SessionConfig::from_env()?;
     let db = Arc::new(db::Database::open(data_dir)?);
+    let router = http::router(db, admin, sessions)?;
     tracing::info!(address = %listener.local_addr()?, "Serveur prêt");
-    axum::serve(listener, http::router(db, admin, sessions)).await?;
+    axum::serve(listener, router).await?;
     Ok(())
 }
