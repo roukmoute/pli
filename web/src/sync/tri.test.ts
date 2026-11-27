@@ -2,6 +2,7 @@ import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import donnees from "../../tests/expediteur-tri.json";
 import receptionVide from "../../tests/reception-vide.json";
+import { reponseRetenue } from "../../tests/reponse-retenue";
 import { amorcerVue, comparerFils, projeterTri } from "./projection-tri";
 import { ressource } from "./ressource";
 import { creerTri } from "./tri";
@@ -47,14 +48,6 @@ const enregistree = (etat: "accepte" | "refuse", destination = "flux") => ({
     date_decision: 777,
   },
 });
-
-function reponseRetenue() {
-  let resolve!: (reponse: Response) => void;
-  const promise = new Promise<Response>((terminer) => {
-    resolve = terminer;
-  });
-  return { promise, resolve };
-}
 
 it("masque l’ancien courrier et affiche les fils dans Flux alors que la décision attend le serveur", async () => {
   const demande = reponseRetenue();

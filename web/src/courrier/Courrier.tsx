@@ -11,6 +11,7 @@ import {
   type Vue,
 } from "../sync";
 import styles from "./courrier.module.css";
+import EcranFil from "./Fil";
 import { Liste } from "./Liste";
 import Menu from "./Menu";
 import EcranTri from "./Tri";
@@ -152,6 +153,10 @@ export default function Courrier(props: Props) {
         component: liste("reception", () => props.textes.inbox),
       },
       { path: "/flux", component: liste("flux", () => t("feed")) },
+      {
+        path: ["/fil/:fil", "/fil/:fil/message/:id"],
+        component: () => <EcranFil cache={cache.lectures} />,
+      },
       {
         path: "/nouveaux-expediteurs",
         component: () => <EcranTri mode="attente" tri={cache.tri} />,

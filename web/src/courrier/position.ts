@@ -25,8 +25,18 @@ export function restaurerPosition(zone: HTMLElement, repere: Repere) {
   zone.scrollTop = repere.defilement;
   const presentes = lignes(zone);
   function retrouver(fil: string) {
+    const lecture = repere.lecture;
+    if (lecture?.fil === fil) {
+      const section = presentes.filter(
+        (ligne) => sectionDe(ligne) === lecture.section,
+      );
+      for (const voisin of [fil, ...lecture.voisines]) {
+        const ligne = section.find((el) => el.dataset.fil === voisin);
+        if (ligne) return ligne;
+      }
+    }
     return (
-      presentes.find((ligne) => ligne.dataset.fil === fil) ??
+      presentes.find((ligne) => ligne.dataset.fil === fil) ||
       presentes.find((ligne) => sectionDe(ligne) === repere.section)
     );
   }
@@ -40,4 +50,5 @@ export function restaurerPosition(zone: HTMLElement, repere: Repere) {
     }
   }
   if (repere.fil) retrouver(repere.fil)?.focus({ preventScroll: true });
+  delete repere.lecture;
 }

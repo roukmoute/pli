@@ -19,7 +19,7 @@ const reperes = [
   ["transfere", "transferer", "forwarded"],
 ] as const;
 
-function Ligne(props: { fil: Fil; focus: () => void }) {
+function Ligne(props: { fil: Fil; focus: () => void; ouvrir: () => void }) {
   const nom = () =>
     props.fil.expediteur.nom ||
     props.fil.expediteur.adresse ||
@@ -32,6 +32,7 @@ function Ligne(props: { fil: Fil; focus: () => void }) {
         class={styles.ligne}
         data-fil={props.fil.id}
         onFocus={props.focus}
+        onClick={props.ouvrir}
       >
         <span class={styles.sr}>{t(props.fil.non_lu ? "unread" : "read")}</span>
         <span class={styles.portrait} aria-hidden="true">
@@ -180,6 +181,25 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                               <Ligne
                                 fil={fil()}
                                 focus={() => retenir(section, fil().id)}
+                                ouvrir={() => {
+                                  retenir(section, fil().id);
+                                  const liste = contenu()[section].map(
+                                    (f) => f.id,
+                                  );
+                                  const index = liste.indexOf(fil().id);
+                                  entree.repere.lecture = {
+                                    fil: fil().id,
+                                    section,
+                                    voisines: [
+                                      ...liste.slice(index + 1),
+                                      ...liste.slice(0, index).reverse(),
+                                    ],
+                                  };
+                                  naviguer(
+                                    `/fil/${encodeURIComponent(fil().id)}`,
+                                    { state: { retour: `/${props.vue}` } },
+                                  );
+                                }}
                               />
                             )}
                           </For>

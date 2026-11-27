@@ -1,0 +1,106 @@
+.colonne {
+  width: min(100%, calc(var(--largeur-lecture) + 5rem));
+  margin-inline: auto;
+  padding: clamp(1rem, 3vw, 2.5rem) 1rem 3rem;
+}
+.colonne h1 {
+  font-size: clamp(1.65rem, 4vw, 2.5rem);
+  letter-spacing: -0.04em;
+  line-height: 1.13;
+  margin: 1rem 0 0.4rem;
+  overflow-wrap: anywhere;
+}
+.retour,
+.distantes {
+  min-height: var(--cible-tactile);
+  color: var(--commande);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.participants {
+  margin: 0 0 1.5rem;
+  color: var(--texte-secondaire);
+  overflow-wrap: anywhere;
+}
+.pile {
+  display: grid;
+  gap: 0.6rem;
+}
+.carte {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon-surface);
+}
+.carte header {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+.auteur {
+  min-height: var(--cible-tactile);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--texte);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  max-width: 100%;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.permalien {
+  color: var(--texte-secondaire);
+  font-size: 0.83rem;
+  text-underline-offset: 0.2em;
+}
+.lecture {
+  padding: 0.25rem clamp(1rem, 3vw, 1.7rem) 1rem;
+}
+.corps {
+  display: block;
+  width: 100%;
+  height: clamp(12rem, 32vh, 24rem);
+  border: 0;
+}
+.pieces {
+  padding: 0;
+  list-style: none;
+  font-size: 0.87rem;
+  overflow-wrap: anywhere;
+}
+.pieces li {
+  padding: 0.6rem 0;
+  border-block-start: 1px solid var(--bord);
+}
+.pieces span {
+  color: var(--texte-secondaire);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.4rem;
+}
+.actions button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: var(--cible-tactile);
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--bord);
+  background: var(--surface);
+  border-radius: 2rem;
+  color: var(--texte-secondaire);
+}
+.actions svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}

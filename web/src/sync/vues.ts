@@ -1,3 +1,4 @@
+import { appliquerLecture, creerLectures } from "./lecture";
 import { lireDossiers, lirePage } from "./pages-api";
 import { amorcerVue, projeterTri } from "./projection-tri";
 import { type Etat, ressource } from "./ressource";
@@ -47,6 +48,7 @@ export interface Repere {
   section: Section;
   fil?: string;
   ancre?: { fil: string; decalage: number };
+  lecture?: { fil: string; section: Section; voisines: string[] };
 }
 
 function nouvelleVue(
@@ -69,6 +71,12 @@ export function creerCourrier(compte: number) {
   const vues = new Map<Vue, ReturnType<typeof nouvelleVue>>();
   const dossiers = ressource(lireDossiers);
   const tri = creerTri(compte, confirmer);
+  const lectures = creerLectures((lecture) => {
+    for (const [vue, entree] of vues) {
+      if (vue in lecture.non_lus)
+        entree.source.corriger((page) => appliquerLecture(page, vue, lecture));
+    }
+  });
 
   function estInbox(vue: Vue) {
     const liste = dossiers.etat();
@@ -132,6 +140,7 @@ export function creerCourrier(compte: number) {
   }
   return {
     dossiers,
+    lectures,
     tri,
     obtenirVue,
     chargerVue: (vue: Vue) => obtenirVue(vue).charger(),

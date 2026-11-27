@@ -116,4 +116,11 @@ export const fr = {
   answered: "Répondu",
   noSubject: "Sans objet",
   mailbox: "Boîte de courrier",
+  threadLoading: "Ouverture du fil…",
+  threadUnavailable: "Ce fil est indisponible.",
+  messageLoading: "Chargement du message…",
+  readUnconfirmed: "La messagerie n’a pas confirmé la lecture.",
+  externalImages: "Afficher les images distantes de ce message",
+  body: "Contenu du message",
+  participants: "Participants",
 } as const;
