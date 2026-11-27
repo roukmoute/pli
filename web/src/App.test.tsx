@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, it, vi } from "vitest";
+import receptionVide from "../tests/reception-vide.json";
 import App from "./App";
 import { getJson } from "./sync/api";
 
@@ -21,17 +22,7 @@ function mount(initial: Response | Promise<Response>) {
     .mockReturnValueOnce(Promise.resolve(initial));
   vi.stubGlobal("fetch", (url: RequestInfo | URL, init?: RequestInit) => {
     if (url === "/api/v1/views/reception")
-      return Promise.resolve(
-        Response.json({
-          compte: 3,
-          couverture: { import_en_cours: false, proportion_indexee: 1 },
-          vue: "reception",
-          revision: 0,
-          nouveaux: [],
-          deja_vus: [],
-          expediteurs_en_attente: 0,
-        }),
-      );
+      return Promise.resolve(Response.json(receptionVide));
     return fetchMock(url, init);
   });
   const view = render(() => <App />);
@@ -149,6 +140,30 @@ it("revérifie la session lorsque l’on revient dans un onglet après une déco
   window.dispatchEvent(new Event("focus"));
   await view.findByRole("heading", { name: "Connexion" });
   expect(view.queryByText(address)).toBeNull();
+});
+
+it("garde la vue du même compte et écarte une ancienne vérification de session en échec", async () => {
+  const { view, fetchMock } = mount(Response.json(session()));
+  const boite = await view.findByRole("heading", { name: "Réception" });
+  let rejeter!: (raison: Error) => void;
+  fetchMock.mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        rejeter = reject;
+      }),
+  );
+  window.dispatchEvent(new Event("focus"));
+  const adresse = "autre-alias@recette.test";
+  fetchMock.mockResolvedValueOnce(
+    Response.json({ ...session(), address: adresse }),
+  );
+  window.dispatchEvent(new Event("pageshow"));
+  await view.findByText(adresse);
+  rejeter(new TypeError("Ancienne connexion interrompue"));
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  expect(view.getByRole("heading", { name: "Réception" })).toBe(boite);
+  view.getByText(adresse);
+  expect(view.queryByRole("alert")).toBeNull();
 });
 
 it("verrouille une réception ouverte à l’échéance annoncée par le serveur", async () => {

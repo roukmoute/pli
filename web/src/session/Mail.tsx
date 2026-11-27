@@ -103,8 +103,7 @@ export default function Mail() {
   };
   return (
     <Show
-      when={activeSession()?.account_id}
-      keyed
+      when={activeSession()}
       fallback={
         <main class={styles.page}>
           <section class={styles.card}>
@@ -146,14 +145,18 @@ export default function Mail() {
         </main>
       }
     >
-      {(compte) => (
-        <Courrier
-          compte={compte}
-          adresse={activeSession()?.address ?? ""}
-          textes={text()}
-          fermer={close}
-          echec={Boolean(closeFailed())}
-        />
+      {(session) => (
+        <Show when={session().account_id} keyed>
+          {(compte) => (
+            <Courrier
+              compte={compte}
+              adresse={session().address}
+              textes={text()}
+              fermer={close}
+              echec={Boolean(closeFailed())}
+            />
+          )}
+        </Show>
       )}
     </Show>
   );
