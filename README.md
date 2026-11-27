@@ -54,6 +54,7 @@ Depuis la racine, `make test` prépare les dépendances et lance les deux suites
 | --- | --- | --- |
 | `WEBMAIL_LISTEN` | `127.0.0.1:8080` | Adresse d’écoute du serveur et cible du proxy de développement. |
 | `WEBMAIL_DATA_DIR` | `./data` | Répertoire local qui accueille `webmail.db` et les fichiers WAL. Il est créé au démarrage. |
+| `WEBMAIL_WEB_DIR` | `web/dist` | Répertoire du front de production servi par Axum, y compris à l’ouverture directe d’une vue. |
 | `WEBMAIL_ADMIN_TOKEN` | vide | Jeton à saisir sur `/admin`. L’accès à l’administration exige un jeton configuré côté serveur. |
 | `WEBMAIL_ALLOW_TEST_PROFILE` | `0` | La valeur `1` autorise le profil GreenMail local avec certificat de test sur une IP de bouclage. |
 | `WEBMAIL_SECRET_KEY` | vide | Clé de 32 octets encodée en 64 chiffres hexadécimaux, requise pour ouvrir une session de courrier. Générez-la une fois avec `openssl rand -hex 32` et conservez-la dans la configuration privée de l’instance. |
@@ -98,6 +99,12 @@ Les listes de fils sont disponibles sur `GET /api/v1/views/reception`, `/api/v1/
 `nouveaux` contient les fils avec au moins une lettre admise non lue. `deja_vus` contient les autres fils. Chaque résumé donne l’expéditeur, l’objet et l’extrait de sa dernière lettre visible, puis les indicateurs et le nombre de lettres du fil. `compteurs` compte les fils de chaque destination. `expediteurs_en_attente` compte les adresses distinctes à trier. La réponse fournit la révision de cette photographie SQLite. Les lectures HTTP utilisent l’index local pendant que le synchroniseur traite les prochains lots IMAP.
 
 `couverture` décrit l’import du dossier consulté, ou d’INBOX pour les trois vues. Avant le décompte IMAP, `attendus` et `proportion_indexee` valent `null`. Après ce décompte, `indexes` et `attendus` comptent des lettres et `proportion_indexee` va de 0 à 1. Un dossier vide déjà vérifié a une couverture de 1.
+
+### Parcourir la boîte dans le navigateur
+
+La session ouvre Réception. Le menu permet de rejoindre Flux, Justificatifs ou un dossier du compte. La touche H ouvre le menu et Échap rend le focus à son bouton. Le champ de recherche du menu reconnaît les noms accentués. Chaque vue garde sa dernière page en mémoire pendant la session, avec le fil au focus, la section et l’ancre de défilement. Au retour, SolidJS affiche cette page pendant qu’une requête actualise son contenu. Les URL peuvent être rechargées directement, y compris `/dossier/{id}`.
+
+Le scénario de navigation dans `scripts/acceptation.sh` ouvre Chromium avec deux boîtes GreenMail fictives. Le banc utilise le navigateur de Playwright ou un Chromium système et installe celui de Playwright si nécessaire. `PLI_CHROMIUM_BIN` permet de choisir un exécutable. Pour conserver les captures de Réception, du menu et de la boîte vide aux trois formats, définissez `PLI_CAPTURES_NAVIGATION` avec le chemin absolu du dossier souhaité. Ajoutez `PLI_MESURE_RETOUR=1` pour chronométrer 100 retours sur ordinateur après 10 tours d’échauffement. Le fichier `mesure-retour.json` accompagne alors les captures.
 
 ### Mesurer une page au milieu de 100 000 messages
 

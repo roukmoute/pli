@@ -17,6 +17,10 @@ if (( ${#features[@]} == 0 )); then
 fi
 
 racine=$PWD
+export WEBMAIL_WEB_DIR="$racine/web/dist"
+make web/node_modules/.installed
+npm --prefix web run build
+node bench/navigation.mjs --preparer
 scripts/outils.sh aps
 if command -v bb >/dev/null; then
     aps() { bb --config "$racine/.outils/aps/bb.edn" "$@"; }
