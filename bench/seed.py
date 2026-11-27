@@ -136,7 +136,7 @@ def populate(port, count, seed):
         mailbox.socket().setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         mailbox.login("alice@recette.test", "alice-test")
         if count:
-            for folder in ("Atelier", "Gesendet", "Papierkorb"):
+            for folder in ("Atelier", "Gesendet", "Papierkorb", "Archives"):
                 require_ok(mailbox.create(folder))
                 require_ok(mailbox.subscribe(folder))
         for number, (date, seen, raw) in enumerate(messages(count, seed), start=1):

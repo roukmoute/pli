@@ -23,14 +23,14 @@ sha256 = "b85bf5453b8c04c960f94a53c9c70fca0227134128cf30afb589b15b341ea223"
 "43:22 0 -> 1" = "Le générateur aléatoire remplit tout le nonce avant sa première lecture."
 
 ["server/src/session/tests/folders.rs"]
-sha256 = "b3057706fc16936c56c4bff741cee73fa802353a3efe062c8f4f91047c79018f"
+sha256 = "213c6d2ee0de79036cf0dc10e08d61b8677db51ea5680c1ae84dd329986f1582"
 ["server/src/session/tests/folders.rs".sites]
 "54:50 false -> true" = "Le serveur présente seulement INBOX dans les deux modes SPECIAL-USE."
 "77:45 1 -> 0" = "Les deux numéros de profil sont invalides pour ce chiffré."
 "80:27 1 -> 0" = "Les cinq octets restent trop courts pour être déchiffrés."
 "80:43 0 -> 1" = "Les cinq octets restent trop courts pour être déchiffrés."
-"189:42 true -> false" = "LIST échoue dans les deux modes SPECIAL-USE."
-"227:37 false -> true" = "L’écriture du repère échoue dans les deux modes SPECIAL-USE."
+"194:42 true -> false" = "LIST échoue dans les deux modes SPECIAL-USE."
+"232:37 false -> true" = "L’écriture du repère échoue dans les deux modes SPECIAL-USE."
 
 ["server/src/session/tests/headers.rs"]
 sha256 = "391ab8bad50dc673b25f8ad024246b4368499b85f795cef9cba8b4450f8fcce6"

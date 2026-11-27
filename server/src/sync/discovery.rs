@@ -71,6 +71,31 @@ fn role_by_name(path: &str, delimiter: Option<&str>) -> Option<&'static str> {
     }
 }
 
+fn archive_sans_attribut(names: &[MailboxListData<'_>]) -> Option<usize> {
+    if names
+        .iter()
+        .any(|n| n.name_attributes.contains(&NameAttribute::Archive))
+    {
+        return None;
+    }
+    let mut candidats = names.iter().enumerate().filter(|(_, n)| {
+        role_by_name(&display_path(&n.name), n.delimiter.as_deref()) == Some("archive")
+            && n.name_attributes.iter().all(|attribut| match attribut {
+                NameAttribute::NoInferiors | NameAttribute::Marked | NameAttribute::Unmarked => {
+                    true
+                }
+                NameAttribute::Extension(valeur) => {
+                    [r"\HasChildren", r"\HasNoChildren", r"\Subscribed"]
+                        .iter()
+                        .any(|nom| valeur.eq_ignore_ascii_case(nom))
+                }
+                _ => false,
+            })
+    });
+    let (index, _) = candidats.next()?;
+    candidats.next().is_none().then_some(index)
+}
+
 pub(super) async fn status(session: &mut ImapSession, name: &str) -> Result<Uids, Error> {
     let status = timeout(
         COMMAND_TIMEOUT,
@@ -117,15 +142,23 @@ pub(super) async fn discover(session: &mut ImapSession) -> Result<Discovery, Err
         .iter()
         .any(|c| matches!(c, Capability::Atom(name) if name.eq_ignore_ascii_case("SPECIAL-USE")));
     let names = list(session, special_use).await?;
+    let archive = if special_use {
+        archive_sans_attribut(&names)
+    } else {
+        None
+    };
     let mut folders = Vec::with_capacity(names.len());
-    for name in names {
+    for (index, name) in names.into_iter().enumerate() {
         let (role, uids) = if name.name_attributes.contains(&NameAttribute::NoSelect) {
             (None, None)
         } else if name.name.eq_ignore_ascii_case("INBOX") {
             (Some("inbox"), Some(inbox))
         } else {
             let role = if special_use {
-                name.name_attributes.iter().find_map(special_role)
+                name.name_attributes
+                    .iter()
+                    .find_map(special_role)
+                    .or_else(|| (archive == Some(index)).then_some("archive"))
             } else {
                 role_by_name(&display_path(&name.name), name.delimiter.as_deref())
             };
@@ -147,6 +180,60 @@ pub(super) async fn discover(session: &mut ImapSession) -> Result<Discovery, Err
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reconnait_seulement_une_archive_standard_non_attribuee() {
+        let dossier = |name: &'static str, name_attributes| MailboxListData {
+            name: name.into(),
+            delimiter: Some("/".into()),
+            name_attributes,
+        };
+        let archive = || {
+            dossier(
+                "INBOX/Archives",
+                vec![NameAttribute::Extension(r"\HasNoChildren".into())],
+            )
+        };
+        assert_eq!(
+            archive_sans_attribut(&[dossier("Personnel/Archives", vec![]), archive()]),
+            Some(1)
+        );
+        assert_eq!(
+            archive_sans_attribut(&[archive(), dossier("Archive", vec![])]),
+            None
+        );
+        assert_eq!(
+            archive_sans_attribut(&[archive(), dossier("Classés", vec![NameAttribute::Archive])]),
+            None
+        );
+        for attribut in [
+            NameAttribute::NoSelect,
+            NameAttribute::All,
+            NameAttribute::Trash,
+            NameAttribute::Extension(r"\Important".into()),
+        ] {
+            assert_eq!(
+                archive_sans_attribut(&[dossier("Archives", vec![attribut])]),
+                None
+            );
+        }
+        for attribut in [
+            NameAttribute::Marked,
+            NameAttribute::Unmarked,
+            NameAttribute::NoInferiors,
+            NameAttribute::Extension(r"\subscribed".into()),
+            NameAttribute::Extension(r"\HasChildren".into()),
+        ] {
+            assert_eq!(
+                archive_sans_attribut(&[dossier("Archiv", vec![attribut])]),
+                Some(0)
+            );
+        }
+        assert_eq!(
+            archive_sans_attribut(&[dossier("Personnel/Archives", vec![])]),
+            None
+        );
+    }
 
     #[test]
     fn matches_the_six_roles_or_keeps_a_personal_folder() {

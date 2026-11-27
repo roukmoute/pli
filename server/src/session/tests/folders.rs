@@ -105,9 +105,13 @@ async fn discovers_special_use_and_resumes_from_the_encrypted_account_after_rest
     let app = TestApp::new()?;
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     add_profile(&app, listener.local_addr()?.port(), true)?;
-    let names = "* LIST (\\Trash) \"/\" Gesendet\r\n* LIST () NIL Sent\r\n* LIST (\\Noselect) \"/\" Classement\r\n";
+    let names = "* LIST (\\Trash) \"/\" Gesendet\r\n* LIST () NIL Sent\r\n* LIST (\\Noselect) \"/\" Classement\r\n* LIST (\\HasNoChildren) \"/\" Archives\r\n";
     let mut first = list_dialog(42, 21, true, names);
-    first.extend([status("Gesendet", 30, 2), status("Sent", 11, 1)]);
+    first.extend([
+        status("Gesendet", 30, 2),
+        status("Sent", 11, 1),
+        status("Archives", 31, 1),
+    ]);
     empty_history(&mut first, "INBOX", 42, 21);
     empty_history(&mut first, "Gesendet", 30, 2);
     first.push(ok("LOGOUT", ""));
@@ -136,12 +140,13 @@ async fn discovers_special_use_and_resumes_from_the_encrypted_account_after_rest
         .await
         .body;
     let folders = list["folders"].as_array().unwrap();
-    assert_eq!(folders.len(), 4);
+    assert_eq!(folders.len(), 5);
     let folder = |path: &str| folders.iter().find(|f| f["path"] == path).unwrap();
     assert_eq!(folder("Gesendet")["role"], "trash");
     assert!(folder("Sent")["role"].is_null());
     assert!(folder("Sent")["delimiter"].is_null());
     assert!(folder("Classement")["role"].is_null());
+    assert_eq!(folder("Archives")["role"], "archive");
     assert_eq!(folder("INBOX")["role"], "inbox");
     let inbox_id = folder("INBOX")["id"].as_i64().unwrap();
     assert_eq!(marker(&app)?, (42, 21));

@@ -37,7 +37,7 @@ Les quatre ports sont publiés sur `127.0.0.1`. Les deux ports TLS utilisent le 
 | `10k` | 10 000 | Import et pagination en local |
 | `100k` | 100 000 | Indexation et recherche en local |
 
-Bob et Carol commencent avec une boîte vide pour chaque jeu. Les jeux peuplés créent aussi trois dossiers vides chez Alice. `Atelier` est personnel, `Gesendet` représente les Envoyés et `Papierkorb` la Corbeille.
+Bob et Carol commencent avec une boîte vide pour chaque jeu. Chez Alice, `Atelier` est un dossier personnel. `Gesendet`, `Papierkorb` et `Archives` permettent de vérifier les rôles des Envoyés, de la Corbeille et des Archives.
 
 La graine par défaut est `42`. Par exemple, `make bench-seed DATASET=10k SEED=7` reproduit le même ordre, les mêmes octets MIME, dates, liens de fil et indicateurs de lecture à chaque exécution. Les UID des messages repartent de 1. GreenMail attribue une nouvelle génération IMAP (`UIDVALIDITY`) à la boîte recréée.
 

@@ -10,11 +10,12 @@ Feature: Découvrir les dossiers et enregistrer le repère de réception
     Then le service répond avec le code <http>
     And le dossier des envoyés est <envoyes>
     And le dossier de la corbeille est <corbeille>
+    And le dossier des archives est <archives>
     And les dossiers personnels sont <personnels>
 
     Examples:
-      | http | envoyes  | corbeille  | personnels |
-      | 200  | Gesendet | Papierkorb | Atelier    |
+      | http | envoyes  | corbeille  | archives | personnels |
+      | 200  | Gesendet | Papierkorb | Archives | Atelier    |
 
   Scenario Outline: Garder le point de départ du tri au redémarrage
     When je consulte les dossiers de ma boîte

@@ -75,6 +75,7 @@ impl World {
         let value = match prefix {
             "le dossier des envoyés est " => paths(&self.json()?, Some("sent"))?,
             "le dossier de la corbeille est " => paths(&self.json()?, Some("trash"))?,
+            "le dossier des archives est " => paths(&self.json()?, Some("archive"))?,
             "les dossiers personnels sont " => paths(&self.json()?, Some("personnel"))?,
             "les chemins des dossiers consultables sont " => paths(&self.json()?, None)?,
             "le prochain numéro de réception au rattachement est " => {
@@ -143,7 +144,7 @@ mod tests {
         let db = Connection::open(dir.path().join("webmail.db")).unwrap();
         db.execute_batch("CREATE TABLE accounts(id, address); INSERT INTO accounts VALUES(3,'alice@recette.test');
             CREATE TABLE inbox_markers(account_id,uidvalidity,uidnext); CREATE TABLE messages(account_id);").unwrap();
-        let body = json!({"folders":[{"path":"P", "role":"trash"},{"path":"A", "role":null},{"path":"E", "role":"sent"}]});
+        let body = json!({"folders":[{"path":"P", "role":"trash"},{"path":"A", "role":null},{"path":"E", "role":"sent"},{"path":"R", "role":"archive"}]});
         let mut world = World::new("127.0.0.1:1".parse().unwrap()).unwrap();
         world.recordings = Some((dir.path().into(), dir.path().join("log")));
         world.response = Some((StatusCode::OK, body.to_string()));
@@ -163,8 +164,9 @@ mod tests {
         for (prefix, expected) in [
             ("le dossier des envoyés est ", "E"),
             ("le dossier de la corbeille est ", "P"),
+            ("le dossier des archives est ", "R"),
             ("les dossiers personnels sont ", "A"),
-            ("les chemins des dossiers consultables sont ", "A,E,P"),
+            ("les chemins des dossiers consultables sont ", "A,E,P,R"),
             ("le prochain numéro de réception au rattachement est ", "25"),
             ("le nombre de messages déjà importés est ", "0"),
             (
