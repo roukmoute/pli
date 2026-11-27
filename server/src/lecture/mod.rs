@@ -1,3 +1,4 @@
+mod indicateurs;
 mod rendu;
 mod stockage;
 
@@ -19,6 +20,7 @@ use crate::{
     session::CompteAuthentifie,
     sync::Lecteur,
 };
+pub(crate) use indicateurs::Indicateur;
 pub(crate) use stockage::Cle;
 
 pub(crate) fn router(lecteur: Lecteur) -> Router<Arc<Database>> {
@@ -26,6 +28,7 @@ pub(crate) fn router(lecteur: Lecteur) -> Router<Arc<Database>> {
         .route("/v1/threads/{id}", get(fil))
         .route("/v1/messages/{id}", get(contenu))
         .route("/v1/messages/{id}/open", post(ouvrir))
+        .route("/v1/messages/flags", post(indicateurs::modifier))
         .route("/v1/messages/{id}/images/{partie}", get(image))
         .layer(Extension(lecteur))
 }
@@ -114,19 +117,30 @@ async fn ouvrir(
 ) -> Result<Json<stockage::Lecture>, ApiError> {
     let compte = account.account_id;
     let cle = Cle::lire(&id).ok_or_else(absent)?;
+    let _ecriture = lecteur.ecriture(compte).await;
     let chemin = sqlite(db.clone(), move |db| {
         Ok(stockage::chemin(&*db.reader()?, compte, cle)?)
     })
     .await?
     .ok_or_else(absent)?;
-    let lu = lecteur.ouvrir(compte, cle, &chemin).await.map_err(|_| {
-        api_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "lecture_non_confirmee",
-            "La messagerie n’a pas confirmé la lecture.",
+    let confirmations = lecteur
+        .marquer(
+            compte,
+            cle.generation,
+            &chemin,
+            &[cle.uid],
+            Indicateur::Lu,
+            true,
         )
-    })?;
-    if !lu {
+        .await
+        .map_err(|_| {
+            api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "lecture_non_confirmee",
+                "La messagerie n’a pas confirmé la lecture.",
+            )
+        })?;
+    if confirmations.get(&cle.uid) != Some(&true) {
         return Err(absent());
     }
     sqlite(db, move |db| stockage::confirmer(db, compte, cle))

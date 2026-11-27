@@ -174,12 +174,7 @@ pub(super) fn confirmer(db: &Database, compte: i64, cle: Cle) -> Result<Option<L
         |r| r.get(0),
     ).optional()?;
     let Some(fil) = fil else { return Ok(None) };
-    tx.execute(
-        "UPDATE messages SET flags=json_insert(flags,'$[#]','\\Seen')
-         WHERE (account_id,folder_id,uidvalidity,uid)=(?1,?2,?3,?4)
-            AND NOT EXISTS(SELECT 1 FROM json_each(flags) WHERE lower(value)='\\seen')",
-        key,
-    )?;
+    super::indicateurs::enregistrer(&tx, compte, cle, super::Indicateur::Lu, true)?;
     let revision = tx.query_row(
         "SELECT revision FROM account_revisions WHERE account_id=?1",
         [compte],

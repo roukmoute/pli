@@ -1,32 +1,55 @@
-use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use async_imap::imap_proto::{AttributeValue, Response};
-use tokio::time::timeout;
+use tokio::{
+    sync::{Mutex, OwnedMutexGuard},
+    time::timeout,
+};
 
 use super::{
     Context, Synchronizer,
     imap::{COMMAND_TIMEOUT, command},
 };
-use crate::{Error, admin::ImapSession, lecture::Cle};
+use crate::{
+    Error,
+    admin::ImapSession,
+    lecture::{Cle, Indicateur},
+};
 
 #[derive(Clone)]
 pub(crate) struct Lecteur {
     context: Arc<Context>,
+    ecritures: Arc<Mutex<HashMap<i64, Arc<Mutex<()>>>>>,
 }
 
 impl Synchronizer {
     pub(crate) fn lecteur(&self) -> Lecteur {
         Lecteur {
             context: self.context.clone(),
+            ecritures: Default::default(),
         }
     }
 }
 
 impl Lecteur {
+    pub(crate) async fn ecriture(&self, compte: i64) -> OwnedMutexGuard<()> {
+        let verrou = self
+            .ecritures
+            .lock()
+            .await
+            .entry(compte)
+            .or_default()
+            .clone();
+        verrou.lock_owned().await
+    }
+
     async fn session(
         &self,
         compte: i64,
-        cle: Cle,
+        generation: u32,
         chemin: &str,
         ecriture: bool,
     ) -> Result<ImapSession, Error> {
@@ -40,7 +63,7 @@ impl Lecteur {
         } else {
             timeout(COMMAND_TIMEOUT, session.examine(chemin)).await??
         };
-        if dossier.uid_validity != Some(cle.generation) {
+        if dossier.uid_validity != Some(generation) {
             return Err("La génération IMAP du dossier a changé.".into());
         }
         Ok(session)
@@ -52,7 +75,7 @@ impl Lecteur {
         cle: Cle,
         chemin: &str,
     ) -> Result<Option<Vec<u8>>, Error> {
-        let mut session = self.session(compte, cle, chemin, false).await?;
+        let mut session = self.session(compte, cle.generation, chemin, false).await?;
         let mut body = None;
         command(
             &mut session,
@@ -77,23 +100,46 @@ impl Lecteur {
         Ok(body)
     }
 
-    pub(crate) async fn ouvrir(&self, compte: i64, cle: Cle, chemin: &str) -> Result<bool, Error> {
-        let mut session = self.session(compte, cle, chemin, true).await?;
-        let mut lu = false;
-        let commande = format!("UID STORE {} +FLAGS (\\Seen)", cle.uid);
-        command(&mut session, &commande, |reply| {
-            if let Some(attrs) = attributs(reply, cle.uid) {
-                lu |= attrs.iter().any(indique_lu);
+    pub(crate) async fn marquer(
+        &self,
+        compte: i64,
+        generation: u32,
+        chemin: &str,
+        uids: &[u32],
+        indicateur: Indicateur,
+        valeur: bool,
+    ) -> Result<BTreeMap<u32, bool>, Error> {
+        let mut session = self.session(compte, generation, chemin, true).await?;
+        let ids = uids
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        let signe = if valeur { "+" } else { "-" };
+        let drapeau = indicateur.imap();
+        let commande = format!("UID STORE {ids} {signe}FLAGS ({drapeau})");
+        let mut etats = BTreeMap::new();
+        command(&mut session, &commande, |reponse| {
+            if let Response::Fetch(_, attrs) = reponse
+                && let Some(uid) = attrs.iter().find_map(|a| match a {
+                    AttributeValue::Uid(uid) => Some(*uid),
+                    _ => None,
+                })
+                && let Some(flags) = attrs.iter().find_map(|a| match a {
+                    AttributeValue::Flags(flags) => Some(flags),
+                    _ => None,
+                })
+            {
+                etats.insert(
+                    uid,
+                    flags.iter().any(|f| f.eq_ignore_ascii_case(drapeau)) == valeur,
+                );
             }
             Ok(())
         })
         .await?;
-        Ok(lu)
+        Ok(etats)
     }
-}
-
-fn indique_lu(attr: &AttributeValue<'_>) -> bool {
-    matches!(attr, AttributeValue::Flags(flags) if flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")))
 }
 
 fn attributs<'a>(reply: &'a Response<'_>, uid: u32) -> Option<&'a [AttributeValue<'a>]> {
