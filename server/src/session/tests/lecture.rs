@@ -166,15 +166,25 @@ async fn applique_les_indicateurs_par_lot_et_isole_chaque_identifiant() -> Resul
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let cookie = preparer(&app, listener.local_addr()?.port())?;
     app.db.writer()?.execute_batch(r#"UPDATE inbox_markers SET uidnext=9 WHERE account_id=2;
+        UPDATE folders SET uidvalidity=7 WHERE id=2;
         INSERT INTO messages(account_id,folder_id,uidvalidity,uid,thread_id,subject,received_at,recipients,flags,size,has_attachments,snippet)
         VALUES (1,1,1,4,'1/fil','Lettre',101,'{}','[]',5,0,''),
-               (1,2,1,4,'1/fil','Lettre',102,'{}','[]',5,0,''),
+               (1,2,7,4,'1/fil','Lettre',102,'{}','[]',5,0,''),
                (2,3,1,3,'2/prive','Lettre',100,'{}','[]',5,0,'');"#)?;
     let store = |commande: &str, reponse: &str| {
         let mut d = selection("SELECT", 1);
         d.push(ok(commande, reponse));
         d
     };
+    let mut atelier = login_dialog("OK bienvenue");
+    atelier.push(ok(
+        r#"SELECT "Atelier""#,
+        "* OK [UIDVALIDITY 7] valable\r\n",
+    ));
+    atelier.push(ok(
+        "UID STORE 4 +FLAGS (\\Seen)",
+        "* 4 FETCH (UID 4 FLAGS (\\Seen))\r\n",
+    ));
     let peer = imap_peer(
         listener,
         vec![
@@ -203,6 +213,7 @@ async fn applique_les_indicateurs_par_lot_et_isole_chaque_identifiant() -> Resul
                 "* 3 FETCH (UID 3 FLAGS (\\Seen))\r\n",
             ),
             selection("SELECT", 9),
+            atelier,
         ],
     );
     let path = "/api/v1/messages/flags";
@@ -290,6 +301,14 @@ async fn applique_les_indicateurs_par_lot_et_isole_chaque_identifiant() -> Resul
         json!([etat("1-1-3", "confirme"), etat("1-1-4", "absent")])
     );
     assert_eq!(post(appel).await.body[0], etat("1-1-3", "non_confirme"));
+    let mut dossier = lus(json!(["1/fil", "2/prive"]));
+    dossier["vue"] = "dossier/2".into();
+    assert_eq!(
+        post(dossier).await.body,
+        json!([etat("1/fil", "confirme"), etat("2/prive", "absent")])
+    );
+    assert_eq!(lire_flags(1, 2, 4)?, r#"["\\Seen"]"#);
+    assert_eq!(lire_flags(1, 1, 4)?, r#"["\\Flagged"]"#);
     peer.await?;
     Ok(())
 }

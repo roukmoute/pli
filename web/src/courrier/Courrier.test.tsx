@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import receptionVide from "../../tests/reception-vide.json";
+import { reponseRetenue } from "../../tests/reponse-retenue";
 import App from "../App";
 import type { Fil, PageFils } from "../sync";
 
@@ -560,6 +561,7 @@ it("annonce la sélection de la page et conserve ses cases pendant une visite du
       name: "Sélectionner Lettre relue",
     });
   await view.findByRole("checkbox", { name: "Sélectionner Lettre neuve" });
+  expect(casePage().indeterminate).toBe(false);
   fireEvent.click(caseNeuve());
   await waitFor(() => expect(casePage().indeterminate).toBe(true));
   expect(casePage().checked).toBe(false);
@@ -574,6 +576,11 @@ it("annonce la sélection de la page et conserve ses cases pendant une visite du
   await view.findByRole("checkbox", { name: "Sélectionner Lettre neuve" });
   expect(caseNeuve().checked).toBe(true);
   expect(caseRelue().checked).toBe(false);
+  fireEvent.click(caseRelue());
+  await waitFor(() => expect(casePage().checked).toBe(true));
+  expect(casePage().indeterminate).toBe(false);
+  fireEvent.click(caseRelue());
+  await waitFor(() => expect(casePage().indeterminate).toBe(true));
   fireEvent.click(casePage());
   await waitFor(() => expect(caseRelue().checked).toBe(true));
   expect(casePage().indeterminate).toBe(false);
@@ -643,9 +650,9 @@ it("cible le fil étoilé, annonce les refus et rend le focus après la confirma
   const focus = vi.spyOn(globale, "focus");
   fireEvent.click(lire());
   await view.findByText("Modification non confirmée pour 1 fil.");
+  await waitFor(() => expect(globale.disabled).toBe(false));
   expect(focus).not.toHaveBeenCalled();
   expect(globale.indeterminate).toBe(true);
-  await waitFor(() => expect(globale.disabled).toBe(false));
   refus = [];
   fireEvent.click(view.getByRole("button", { name: "Marquer comme non lu" }));
   await waitFor(() =>
@@ -665,4 +672,32 @@ it("cible le fil étoilé, annonce les refus et rend le focus après la confirma
   });
   expect(document.activeElement).toBe(globale);
   expect(window.location.pathname).toBe("/");
+});
+
+it("respecte le focus déplacé au menu pendant une opération sur le lot", async () => {
+  const { view, fetchMock, lireReception } = ouvrir();
+  const globale = await view.findByRole<HTMLInputElement>("checkbox", {
+    name: "Sélectionner la page",
+  });
+  const attente = reponseRetenue();
+  vi.stubGlobal("fetch", (url: RequestInfo | URL) =>
+    url === "/api/v1/messages/flags" ? attente.promise : fetchMock(url),
+  );
+  fireEvent.click(globale);
+  const action = await view.findByRole("button", { name: "Marquer comme lu" });
+  fireEvent.click(action);
+  const menu = view.getByRole("button", { name: "Menu" });
+  menu.focus();
+  attente.resolve(
+    Response.json([
+      { id: "neuve", etat: "confirme" },
+      { id: "relue", etat: "confirme" },
+    ]),
+  );
+  await waitFor(() => {
+    expect(lireReception).toHaveBeenCalledTimes(2);
+    expect(action.isConnected).toBe(false);
+    expect(globale.disabled).toBe(false);
+  });
+  expect(document.activeElement).toBe(menu);
 });
