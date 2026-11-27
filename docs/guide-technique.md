@@ -104,6 +104,16 @@ La session ouvre Réception. Le menu permet de rejoindre Flux, Justificatifs ou 
 
 Le scénario de navigation dans `scripts/acceptation.sh` ouvre Chromium avec deux boîtes GreenMail fictives. Le banc utilise le navigateur de Playwright ou un Chromium système et installe celui de Playwright si nécessaire. `PLI_CHROMIUM_BIN` permet de choisir un exécutable. Pour conserver les captures de Réception, du menu et de la boîte vide aux trois formats, définissez `PLI_CAPTURES_NAVIGATION` avec le chemin absolu du dossier souhaité. Ajoutez `PLI_MESURE_RETOUR=1` pour chronométrer 100 retours sur ordinateur après 10 tours d’échauffement. Le fichier `mesure-retour.json` accompagne alors les captures.
 
+### Vérifier le parcours de lecture de bout en bout
+
+```sh
+make e2e
+```
+
+La commande démarre un banc isolé, un serveur Pli et Chromium sans écran. Le scénario consulte une Réception en cours d’import, vérifie le tri à l’arrivée de deux messages, ouvre un fil et retrouve la décision après redémarrage. Il contrôle aussi le retour à la ligne de lecture à 390 × 844 pixels. Les services de test et la base temporaire sont arrêtés ou supprimés à la sortie.
+
+Sur ordinateur, 10 retours d’échauffement précèdent 100 mesures du clic à la première ligne visible. Chromium simule 10 Mbit/s en réception, 2 Mbit/s en envoi et 80 ms de latence. Le contrôle échoue si le p95 atteint 50 ms ou si une requête précède l’affichage de la liste en cache. Les observations individuelles et la synthèse se trouvent dans `bench/traces/e2e/`. La CI joint ces fichiers à l’exécution du job `e2e`.
+
 ### Mesurer une page au milieu de 100 000 messages
 
 ```sh
