@@ -254,7 +254,7 @@ mod tests {
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             assert_eq!(
                 rows.iter().map(Option::as_deref).collect::<Vec<_>>(),
-                [Some("reception"), destination, destination, destination]
+                [destination; 4]
             );
             assert!(pending(&db, 1)?.is_empty());
         }

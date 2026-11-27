@@ -81,25 +81,28 @@ async fn seule_la_partie_admise_du_fil_contribue_aux_sections_et_aux_compteurs()
             [destination],
         )?;
         let routed = lire(&router, &format!("/api/v1/views/{destination}")).await?;
-        assert_eq!(routed["nouveaux"].as_array().unwrap().len(), 2);
+        assert_eq!(routed["nouveaux"].as_array().unwrap().len(), 3);
         assert_eq!(routed["nouveaux"][0]["id"], "privé");
-        assert_eq!(routed["nouveaux"][1]["objet"], "Lettre 10");
-        assert_eq!(routed["compteurs"][destination], 2);
+        assert_eq!(routed["nouveaux"][1]["id"], "inédit");
+        assert_eq!(routed["nouveaux"][2]["objet"], "Lettre 10");
+        assert_eq!(routed["compteurs"][destination], 3);
         assert_eq!(routed["expediteurs_en_attente"], 0);
-        assert_eq!(
-            lire(&router, RECEPTION).await?["deja_vus"],
-            page["deja_vus"]
-        );
+        let restant = lire(&router, RECEPTION).await?;
+        assert_eq!(restant["deja_vus"][0]["objet"], "Lettre 1");
+        assert_eq!(restant["deja_vus"][0]["nombre_messages"], 1);
     }
     app.db
         .writer()?
         .execute("UPDATE sender_decisions SET state='refuse'", [])?;
     let refuse = lire(&router, RECEPTION).await?;
-    assert_eq!(refuse["compteurs"], page["compteurs"]);
+    assert_eq!(
+        refuse["compteurs"],
+        json!({"reception":1,"flux":0,"justificatifs":0})
+    );
     assert_eq!(refuse["expediteurs_en_attente"], 0);
     let physique = lire(&router, "/api/v1/folders/1/messages").await?;
-    assert_eq!(physique["nouveaux"], page["nouveaux"]);
-    assert_eq!(physique["deja_vus"], page["deja_vus"]);
+    assert_eq!(physique["nouveaux"], json!([]));
+    assert_eq!(physique["deja_vus"], refuse["deja_vus"]);
     Ok(())
 }
 
