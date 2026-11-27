@@ -35,6 +35,7 @@ export async function request(
   path: `/${string}`,
   method = "GET",
   payload?: unknown,
+  signal?: AbortSignal,
 ): Promise<Response> {
   const revision = sessionRevision;
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -45,6 +46,7 @@ export async function request(
     body: JSON.stringify(payload),
     credentials: "same-origin",
     redirect: "error",
+    ...(signal && { signal }),
   });
   if (!response.ok) {
     if (

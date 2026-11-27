@@ -186,14 +186,13 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                                   const liste = contenu()[section].map(
                                     (f) => f.id,
                                   );
-                                  const index = liste.indexOf(fil().id);
+                                  const suivantes = liste.splice(
+                                    liste.indexOf(fil().id),
+                                  );
                                   entree.repere.lecture = {
                                     fil: fil().id,
                                     section,
-                                    voisines: [
-                                      ...liste.slice(index + 1),
-                                      ...liste.slice(0, index).reverse(),
-                                    ],
+                                    ordre: suivantes.concat(liste.reverse()),
                                   };
                                   naviguer(
                                     `/fil/${encodeURIComponent(fil().id)}`,

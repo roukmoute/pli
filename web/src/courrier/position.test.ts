@@ -60,3 +60,31 @@ it("retrouve la section lorsque le fil ancré a disparu et accepte une section v
   expect(zone.scrollTop).toBe(120);
   expect(focus).toHaveBeenCalledTimes(1);
 });
+
+it("se replace sur la voisine de la section d’origine quand la lettre ouverte a changé de section", () => {
+  const { zone, atelier, livre, arrivee, repere } = liste();
+  const ancre = { fil: "atelier", decalage: -11 };
+  repere.fil = "atelier";
+  repere.ancre = ancre;
+  repere.lecture = {
+    fil: "atelier",
+    section: "deja_vus",
+    ordre: ["atelier", "disparue", "livre"],
+  };
+  arrivee.parentElement?.append(atelier);
+  const voisine = vi.spyOn(livre, "focus");
+  const ouverte = vi.spyOn(atelier, "focus");
+  restaurerPosition(zone, repere);
+  expect(voisine).toHaveBeenCalledWith({ preventScroll: true });
+  expect(ouverte).not.toHaveBeenCalled();
+  expect(zone.scrollTop).toBe(165);
+  expect(repere.lecture).toBeUndefined();
+  repere.lecture = {
+    fil: "atelier",
+    section: "deja_vus",
+    ordre: ["atelier", "livre"],
+  };
+  livre.remove();
+  restaurerPosition(zone, repere);
+  expect(ouverte).toHaveBeenCalledWith({ preventScroll: true });
+});

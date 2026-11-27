@@ -30,7 +30,7 @@ export function restaurerPosition(zone: HTMLElement, repere: Repere) {
       const section = presentes.filter(
         (ligne) => sectionDe(ligne) === lecture.section,
       );
-      for (const voisin of [fil, ...lecture.voisines]) {
+      for (const voisin of lecture.ordre) {
         const ligne = section.find((el) => el.dataset.fil === voisin);
         if (ligne) return ligne;
       }

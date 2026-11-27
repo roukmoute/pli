@@ -15,7 +15,7 @@ function Rendu(props: { id: string; contenu: Contenu }) {
     new Map(),
   );
   onSettled(() => {
-    let visible = true;
+    const chargement = new AbortController();
     const parties = new Set(
       props.contenu.images.flatMap((i) =>
         i.type === "integree" ? [i.partie] : [],
@@ -25,10 +25,13 @@ function Rendu(props: { id: string; contenu: Contenu }) {
       void Promise.allSettled(
         [...parties].map(
           async (partie) =>
-            [partie, await imageIntegree(props.id, partie)] as const,
+            [
+              partie,
+              await imageIntegree(props.id, partie, chargement.signal),
+            ] as const,
         ),
       ).then((resultats) => {
-        if (visible)
+        if (!chargement.signal.aborted)
           publier(
             new Map(
               resultats.flatMap((r) =>
@@ -38,9 +41,7 @@ function Rendu(props: { id: string; contenu: Contenu }) {
           );
       });
     }
-    return () => {
-      visible = false;
-    };
+    return () => chargement.abort();
   });
   return (
     <>

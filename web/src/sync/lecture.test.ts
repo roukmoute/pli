@@ -115,6 +115,12 @@ it("répartit les fils avec la révision de chaque vue et respecte les opératio
   const premiere = courrier.lectures.ouvrir("1", "a");
   expect(courrier.lectures.ouvrir("1", "a")).toBe(premiere);
   await courrier.lectures.ouvrir("2", "a");
+  expect(fils.etat()).toMatchObject({
+    valeur: [
+      { id: "1", non_lu: true },
+      { id: "2", non_lu: false },
+    ],
+  });
   attente.resolve(
     Response.json({ ...lecture, revision: 5, non_lus: { reception: true } }),
   );
@@ -129,6 +135,24 @@ it("répartit les fils avec la révision de chaque vue et respecte les opératio
     valeur: { deja_vus: [{ id: "a" }, { id: "c" }] },
   });
   expect(fetch.mock.calls).toHaveLength(4);
+});
+
+it("applique une seule fois la même révision après une ouverture rejouée", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        fil: "jardin",
+        revision: 6,
+        non_lus: { reception: false },
+      }),
+    ),
+  );
+  const confirmer = vi.fn();
+  const cache = creerLectures(confirmer);
+  await cache.ouvrir("5", "jardin");
+  await cache.ouvrir("5", "jardin");
+  expect(confirmer).toHaveBeenCalledTimes(1);
 });
 it("borne chaque cache à quarante entrées et conserve un fil récemment relu", () => {
   const cache = creerLectures(() => {});

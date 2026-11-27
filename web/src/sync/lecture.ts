@@ -83,7 +83,7 @@ export function creerLectures(confirmer: (lecture: Lecture) => void) {
           liste.map((m) => (m.id === id ? { ...m, non_lu: false } : m)),
         );
         const derniere = revisions.get(filId);
-        if (derniere === undefined || lecture.revision >= derniere) {
+        if (derniere === undefined || lecture.revision > derniere) {
           revisions.set(filId, lecture.revision);
           confirmer(lecture);
         }
@@ -99,9 +99,13 @@ export type Lectures = ReturnType<typeof creerLectures>;
 export async function imageIntegree(
   id: string,
   partie: number,
+  signal?: AbortSignal,
 ): Promise<string> {
   const response = await request(
     `/messages/${encodeURIComponent(id)}/images/${partie}`,
+    "GET",
+    undefined,
+    signal,
   );
   const blob = await response.blob();
   if (

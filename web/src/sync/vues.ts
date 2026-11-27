@@ -48,7 +48,7 @@ export interface Repere {
   section: Section;
   fil?: string;
   ancre?: { fil: string; decalage: number };
-  lecture?: { fil: string; section: Section; voisines: string[] };
+  lecture?: { fil: string; section: Section; ordre: string[] };
 }
 
 function nouvelleVue(

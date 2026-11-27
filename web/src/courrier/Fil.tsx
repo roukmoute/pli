@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import { Avatar } from "../components/Avatar";
 import { t } from "../i18n";
 import { Icone } from "../icons/Icone";
@@ -37,14 +37,30 @@ function Carte(props: {
   message: Entete;
   fil: string;
   active: boolean;
+  cible?: string;
   cache: Lectures;
 }) {
+  const lieu = useLocation<{ retour: string }>();
+  let carte!: HTMLElement;
   const [choix, basculer] = createSignal<boolean>();
   const ouverte = () => choix() ?? props.active;
   const chemin = () =>
     `/fil/${encodeURIComponent(props.fil)}/message/${encodeURIComponent(props.message.id)}`;
+  createEffect(
+    () => props.cible,
+    (cible) => {
+      if (cible !== props.message.id) return;
+      basculer(true);
+      const zone = carte.closest("main");
+      if (!zone) return;
+      const bounds = zone.getBoundingClientRect();
+      const position = carte.getBoundingClientRect();
+      if (position.top < bounds.top || position.top >= bounds.bottom)
+        zone.scrollTop += position.top - bounds.top;
+    },
+  );
   return (
-    <article class={styles.carte}>
+    <article ref={carte} class={styles.carte}>
       <header>
         <button
           type="button"
@@ -57,7 +73,13 @@ function Carte(props: {
           </span>
           <strong>{nom(props.message)}</strong>
         </button>
-        <a class={styles.permalien} href={chemin()}>
+        <a
+          class={styles.permalien}
+          href={chemin()}
+          replace
+          noscroll
+          state={JSON.stringify(lieu.state)}
+        >
           <time datetime={new Date(props.message.date * 1000).toISOString()}>
             {date.format(props.message.date * 1000)}
           </time>
@@ -115,6 +137,7 @@ function Pile(props: { fil: string; id?: string; cache: Lectures }) {
                   message={m()}
                   fil={props.fil}
                   active={courant().selection === m().id}
+                  cible={props.id}
                   cache={props.cache}
                 />
               )}

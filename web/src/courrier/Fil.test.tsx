@@ -66,6 +66,120 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it("annonce le chargement du fil puis distingue un échec de lecture et une boîte vide", async () => {
+  const attente = reponseRetenue();
+  let reponse = attente.promise;
+  const { vue } = afficher(racine(plan), () => reponse);
+  expect(await vue.findByText("Ouverture du fil…")).toBeTruthy();
+  attente.resolve(new Response(null, { status: 404 }));
+  await vue.findByRole("alert");
+  reponse = Promise.resolve(Response.json([]));
+  fireEvent.click(vue.getByRole("button", { name: "Réessayer" }));
+  await waitFor(() =>
+    expect(vue.getByRole("alert").textContent).toContain(
+      "Ce fil est indisponible.",
+    ),
+  );
+  expect(vue.queryByTitle("Contenu du message")).toBeNull();
+});
+
+it.each([
+  { haut: 10, deplacement: -50 },
+  { haut: 60, deplacement: null },
+  { haut: 170, deplacement: null },
+  { haut: 400, deplacement: 340 },
+])(
+  "révèle le message ciblé par son lien à la position $haut",
+  async ({ haut, deplacement }) => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        return this.tagName === "MAIN"
+          ? DOMRect.fromRect({ y: 60, height: 340 })
+          : DOMRect.fromRect({ y: haut, height: 40 });
+      });
+    const scroll = vi.spyOn(Element.prototype, "scrollTop", "set");
+    try {
+      const { vue } = afficher(`${racine(plan)}/message/1`, (chemin) =>
+        chemin.startsWith("/threads/")
+          ? Response.json([
+              entete("1", "Noa", "Cible"),
+              entete("2", "Noa", "Suite"),
+            ])
+          : corps("Lettre ciblée"),
+      );
+      await vue.findByTitle("Contenu du message");
+      const zone = vue.getByRole("main");
+      const ecritures = scroll.mock.calls.flatMap(([v], i) =>
+        scroll.mock.contexts[i] === zone ? [v] : [],
+      );
+      expect(ecritures).toEqual(deplacement === null ? [] : [deplacement]);
+    } finally {
+      rect.mockRestore();
+      scroll.mockRestore();
+    }
+  },
+);
+
+it("garde Flux comme destination de retour d’un permalien et arrête le chargement des images de la carte fermée", async () => {
+  let signal: AbortSignal | null | undefined;
+  const attente = reponseRetenue();
+  const lettres = [
+    entete("1", "Noa", "Premier"),
+    entete("2", "Léa", "Fil du jardin"),
+  ];
+  const { vue } = afficher("/flux", (chemin, options) => {
+    if (chemin === "/views/flux")
+      return Response.json({
+        ...reception,
+        vue: "flux",
+        deja_vus: [
+          {
+            id: plan,
+            objet: "Fil du jardin",
+            expediteur: { nom: "Noa" },
+            date: 100,
+            nombre_messages: 2,
+          },
+        ],
+      });
+    if (chemin.startsWith("/threads/")) return Response.json(lettres);
+    if (chemin === "/messages/2")
+      return corps("", {
+        html: '<img src="cid:pli-0">',
+        images: [{ type: "integree", partie: 7 }],
+      });
+    if (chemin === "/messages/1")
+      return corps("", {
+        html: '<img src="cid:pli-0">',
+        images: [{ type: "distante", url: "https://exemple.test/image.png" }],
+      });
+    if (chemin.endsWith("/images/7")) {
+      signal = options?.signal;
+      return attente.promise;
+    }
+    throw Error(chemin);
+  });
+  fireEvent.click(await vue.findByRole("button", { name: /Fil du jardin/ }));
+  await waitFor(() => expect(signal?.aborted).toBe(false));
+  expect(vue.queryByRole("button", { name: /Afficher les images/ })).toBeNull();
+  expect(vue.queryByText(/La messagerie n’a pas confirmé/)).toBeNull();
+  fireEvent.click(vue.getByRole("button", { name: "Léa" }));
+  await waitFor(() => expect(signal?.aborted).toBe(true));
+  attente.resolve(new Response(null, { status: 404 }));
+  const longueur = history.length;
+  const liens = vue
+    .getAllByRole("article")
+    .map((el) => within(el).getByRole("link"));
+  fireEvent.click(liens[0]);
+  await vue.findByRole("button", { name: /Afficher les images/ });
+  expect(location.pathname).toBe(`${racine(plan)}/message/1`);
+  expect(history.length).toBe(longueur);
+  fireEvent.click(vue.getByRole("button", { name: /Retour/ }));
+  await vue.findByRole("heading", { name: "Flux" });
+  expect(document.activeElement?.getAttribute("data-fil")).toBe(plan);
+});
+
 it("empile les messages, garde les citations et limite les images distantes au message ouvert", async () => {
   const ancien = { ...entete("1", null, "Premier plan"), adresse: null };
   const { vue, fetch } = afficher(racine(plan), (chemin, options) => {
