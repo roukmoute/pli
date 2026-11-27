@@ -239,6 +239,8 @@ async fn pagine_les_decisions_et_les_lettres_sans_melanger_deux_generations() ->
         for uid in 1..=40 {
             lettre(&db, 1, uid, &format!("fil-{uid}"), ADRESSE, json!([]))?;
         }
+        db.execute(r#"UPDATE messages SET thread_id='fil-40',flags='["\\Flagged"]',received_at=1 WHERE uid=1"#, [])?;
+        db.execute("UPDATE messages SET received_at=200 WHERE uid=40", [])?;
         for n in 0..20 {
             db.execute(
                 "INSERT INTO sender_decisions(account_id,address,state) VALUES(1,?1,'refuse')",
@@ -249,6 +251,13 @@ async fn pagine_les_decisions_et_les_lettres_sans_melanger_deux_generations() ->
     let route = app.router();
     let liste = lire(&route, HISTORIQUE).await?;
     assert_eq!(liste["expediteurs"].as_array().unwrap().len(), 20);
+    let fils = liste["expediteurs"][0]["apercus"].as_array().unwrap();
+    assert_eq!(fils.len(), 20);
+    let premier = fils.first().unwrap();
+    assert_eq!(premier["id"], "fil-40");
+    assert_eq!(premier["objet"], "Lettre 40");
+    assert_eq!(premier["nombre_messages"], 2);
+    assert_eq!(premier["etoile"], true);
     assert_eq!(liste["suite"], "z18@recette.test");
     let suite = lire(&route, &format!("{HISTORIQUE}?apres=z18%40recette.test")).await?;
     assert_eq!(suite["expediteurs"].as_array().unwrap().len(), 1);

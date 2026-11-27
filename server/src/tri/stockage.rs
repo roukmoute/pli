@@ -117,13 +117,17 @@ fn apercus(
     compte: i64,
     adresse: &str,
 ) -> rusqlite::Result<Vec<crate::pages::Thread>> {
-    db.prepare_cached("WITH classes AS (
+    db.prepare_cached("WITH recents AS MATERIALIZED (
+       SELECT thread_id FROM screening_letters WHERE account_id=?1 AND sender_address=?2
+       GROUP BY thread_id ORDER BY max(received_at) DESC,thread_id DESC LIMIT ?3
+    ), classes AS (
        SELECT *, count(*) OVER fil AS total, max(unread) OVER fil AS non_lu, max(starred) OVER fil AS etoile,
            max(attached) OVER fil AS piece, max(answered) OVER fil AS repondu, max(forwarded) OVER fil AS transfere,
            row_number() OVER (PARTITION BY thread_id ORDER BY received_at DESC, uid DESC) AS rang
-       FROM screening_letters WHERE account_id=?1 AND sender_address=?2 WINDOW fil AS (PARTITION BY thread_id))
+       FROM screening_letters WHERE account_id=?1 AND sender_address=?2 AND thread_id IN (SELECT thread_id FROM recents)
+       WINDOW fil AS (PARTITION BY thread_id))
        SELECT thread_id,subject,sender_name,sender_address,snippet,received_at,total,non_lu,etoile,piece,repondu,transfere
-       FROM classes WHERE rang=1 ORDER BY received_at DESC,thread_id DESC LIMIT ?3")?
+       FROM classes WHERE rang=1 ORDER BY received_at DESC,thread_id DESC")?
       .query_map(params![compte,adresse,PAR_PAGE as i64],crate::pages::lire_resume)?.collect()
 }
 
