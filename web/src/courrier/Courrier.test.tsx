@@ -267,7 +267,16 @@ it("affiche le message de filtre vide uniquement quand aucun raccourci ni dossie
   const { view } = ouvrir();
   fireEvent.click(await view.findByRole("button", { name: "Menu" }));
   const menu = await view.findByRole("dialog");
-  await within(menu).findByRole("link", { name: "Études" });
+  const personnel = await within(menu).findByRole("link", { name: "Études" });
+  expect(personnel.getAttribute("href")).toBe("/dossier/8");
+  expect(
+    within(menu).getByRole("link", { name: "Envoyés" }).getAttribute("href"),
+  ).toBe("/dossier/7");
+  expect(
+    within(menu)
+      .getByRole("button", { name: "Brouillons" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
   const champ = within(menu).getByRole("searchbox");
   for (const [saisie, destination] of [
     ["envoy", "Envoyés"],
@@ -316,6 +325,9 @@ it("respecte les raccourcis du navigateur et restaure le focus après chacune de
     fireEvent.keyDown(window, { key: "H" });
     const menu = await view.findByRole("dialog");
     const fermer = within(menu).getByRole("button", { name: "Fermer le menu" });
+    fireEvent.keyDown(fermer, { key: "ArrowDown" });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(view.getByRole("dialog")).toBe(menu);
     if (fermeture === "bouton") fireEvent.click(fermer);
     if (fermeture === "annulation")
       fireEvent(menu, new Event("cancel", { cancelable: true }));
@@ -333,6 +345,7 @@ it("laisse le navigateur gérer les clics modifiés et garde le défilement de l
   const flux = await view.findByRole("link", { name: "Flux" });
   const scroll = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   const focus = vi.spyOn(bouton, "focus");
+  const clicTraite = vi.fn();
   for (const option of [
     { button: 1 },
     { ctrlKey: true },
@@ -340,10 +353,17 @@ it("laisse le navigateur gérer les clics modifiés et garde le défilement de l
     { altKey: true },
     { shiftKey: true },
   ]) {
-    document.addEventListener("click", (e) => e.preventDefault(), {
-      once: true,
-    });
+    window.addEventListener(
+      "click",
+      (e) => {
+        clicTraite(e.defaultPrevented);
+        e.preventDefault();
+      },
+      { once: true },
+    );
     fireEvent.click(flux, option);
+    expect(clicTraite).toHaveBeenLastCalledWith(false);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(view.getByRole("dialog")).toBeTruthy();
     expect(location.pathname).toBe("/");
   }
@@ -417,22 +437,33 @@ it("actualise une page en cours d’import et arrête de sonder après la fin de
 
 it("permet de reprendre le chargement des dossiers et d’ouvrir directement un dossier absent du catalogue", async () => {
   window.history.replaceState(null, "", "/dossier/8");
+  let echouer!: (cause: Error) => void;
+  const autreDossier = { id: 18, path: "Devis", role: null, hidden: false };
   const lireDossiers = vi
     .fn()
     .mockRejectedValueOnce(new Error("Coupure"))
-    .mockRejectedValueOnce(new Error("Toujours hors ligne"))
-    .mockResolvedValue(Response.json({ folders: [] }));
+    .mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          echouer = reject;
+        }),
+    )
+    .mockResolvedValue(Response.json({ folders: [autreDossier] }));
   const { view } = ouvrir(reception, lireDossiers);
   await view.findByRole("heading", { name: "Dossiers" });
   await view.findByRole("button", { name: /Lettre atelier/ });
   fireEvent.click(view.getByRole("button", { name: "Menu" }));
   const menu = await view.findByRole("dialog");
+  await waitFor(() => expect(lireDossiers).toHaveBeenCalledTimes(2));
+  expect(
+    within(menu).queryByText("Les dossiers sont indisponibles."),
+  ).toBeNull();
+  echouer(new Error("Toujours hors ligne"));
   await within(menu).findByText("Les dossiers sont indisponibles.");
   fireEvent.click(within(menu).getByRole("button", { name: "Réessayer" }));
-  await waitFor(() =>
-    expect(
-      within(menu).queryByText("Les dossiers sont indisponibles."),
-    ).toBeNull(),
-  );
+  await within(menu).findByRole("link", { name: "Devis" });
+  expect(
+    within(menu).queryByText("Les dossiers sont indisponibles."),
+  ).toBeNull();
   expect(view.getByRole("heading", { name: "Dossiers" })).toBeTruthy();
 });
