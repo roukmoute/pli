@@ -1,10 +1,12 @@
-use std::{fmt::Display, net::SocketAddr, time::Duration};
+use std::{fmt::Display, net::SocketAddr, path::PathBuf, time::Duration};
 
 use reqwest::{Client, RequestBuilder, StatusCode};
 use serde_json::Value;
 
 use crate::{Error, Example};
+mod privacy;
 mod profiles;
+mod sessions;
 
 const TOKEN: &str = "jeton-fictif-acceptation";
 
@@ -28,6 +30,8 @@ pub(crate) struct World {
     address: SocketAddr,
     client: Client,
     response: Option<(StatusCode, String)>,
+    session: sessions::SessionSteps,
+    pub(crate) recordings: Option<(PathBuf, PathBuf)>,
 }
 
 impl World {
@@ -41,6 +45,8 @@ impl World {
             address,
             client,
             response: None,
+            session: Default::default(),
+            recordings: None,
         })
     }
 
@@ -52,6 +58,7 @@ impl World {
 
     async fn send(&mut self, request: RequestBuilder) -> Result<(), Problem> {
         let response = request.send().await.map_err(Problem::infra)?;
+        self.session.record_cookie(&response);
         self.response = Some((
             response.status(),
             response.text().await.map_err(Problem::infra)?,
@@ -79,7 +86,7 @@ impl World {
                 .as_str()
                 .ok_or_else(|| Problem::Step("La réponse ne contient pas d’état textuel".into()))?;
             expect(state, example_value(example, key)?)?;
-        } else {
+        } else if !self.privacy_step(text, example)? && !self.session_step(text, example).await? {
             self.profile_step(text, example).await?;
         }
         Ok(())

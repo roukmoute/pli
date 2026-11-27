@@ -8,7 +8,7 @@ L’objectif est de proposer une interface inspirée de HEY pour lire, trier et 
 
 Depuis la racine du dépôt, avec rustup, un compilateur C, GNU Make et Node 24 muni de npm, lancez `make dev`. Si vous utilisez nvm, `nvm install` sélectionne la version du fichier `.nvmrc`. Rustup installe la chaîne du projet au premier appel à Cargo. Le lancement en développement utilise Bash 4.3 ou ultérieur.
 
-Ouvrez <http://127.0.0.1:5173>. L’accueil vérifie la disponibilité du serveur et de sa base. Vite transmet les requêtes `/api` à Axum. Ctrl+C arrête les deux processus.
+Ouvrez <http://127.0.0.1:5173>. L’accueil permet de se connecter à une boîte et restaure la Réception quand la session est encore valide. Vite transmet les requêtes `/api` à Axum. Ctrl+C arrête les deux processus.
 
 | Commande | Résultat |
 | --- | --- |
@@ -54,6 +54,8 @@ Depuis la racine, `make test` prépare les dépendances et lance les deux suites
 | `WEBMAIL_DATA_DIR` | `./data` | Répertoire local qui accueille `webmail.db` et les fichiers WAL. Il est créé au démarrage. |
 | `WEBMAIL_ADMIN_TOKEN` | vide | Jeton à saisir sur `/admin`. L’accès à l’administration exige un jeton configuré côté serveur. |
 | `WEBMAIL_ALLOW_TEST_PROFILE` | `0` | La valeur `1` autorise le profil GreenMail local avec certificat de test sur une IP de bouclage. |
+| `WEBMAIL_SECRET_KEY` | vide | Clé de 32 octets encodée en 64 chiffres hexadécimaux, requise pour ouvrir une session de courrier. Générez-la une fois avec `openssl rand -hex 32` et conservez-la dans la configuration privée de l’instance. |
+| `WEBMAIL_SESSION_TTL_SECONDS` | `28800` | Durée d’une session en secondes à compter de la connexion, soit huit heures par défaut. |
 
 Sur `/admin`, ouvrez l’administration puis choisissez **Ajouter un serveur**. Le préréglage Infomaniak utilise `mail.infomaniak.com`, IMAP 993 en TLS implicite et SMTP 587 en STARTTLS. Le banc local propose IMAPS 3993 et SMTPS 3465. Les ports sont modifiables.
 
@@ -61,7 +63,7 @@ Sur `/admin`, ouvrez l’administration puis choisissez **Ajouter un serveur**. 
 
 L’API d’administration utilise l’en-tête `Authorization: Bearer <jeton>`. `GET /api/admin/v1/servers` renvoie les serveurs et les préréglages. `POST /api/admin/v1/servers/test` teste un candidat. `POST /api/admin/v1/servers` le crée et `PUT /api/admin/v1/servers/{id}` le modifie. Ces trois opérations reçoivent un objet JSON contenant `profile` (même structure qu’un préréglage) et `credentials` (champs `username` et `password`). Une sauvegarde refusée renvoie le diagnostic avec le statut HTTP 422 et conserve le profil en service.
 
-Les scénarios de `scripts/acceptation.sh` démarrent un GreenMail Docker temporaire et attendent son démarrage avec OpenSSL. Pour réutiliser un banc local déjà lancé, exportez ses deux ports dans `PLI_APS_IMAPS_PORT` et `PLI_APS_SMTPS_PORT`. Le scénario utilise le compte fictif `diagnostic` avec le mot de passe de recette `essai-local`.
+Les scénarios de `scripts/acceptation.sh` démarrent un GreenMail Docker temporaire et attendent son démarrage avec OpenSSL. Pour réutiliser le banc du projet, exportez ses deux ports dans `PLI_APS_IMAPS_PORT` et `PLI_APS_SMTPS_PORT`. Les scénarios utilisent les boîtes fictives d’Alice et de Bob du [banc GreenMail](bench/README.md).
 
 Make génère `.env.example` à partir de `config/example.env`. La commande `make .env.example` permet aussi de le préparer seul. Pour utiliser vos valeurs dans le terminal courant, copiez le modèle dans `.env`, modifiez-le, puis exportez ses variables avant de lancer le service.
 
@@ -70,6 +72,20 @@ set -a
 . ./.env
 set +a
 ```
+
+## Connecter une boîte
+
+Sur `/admin`, associez le domaine des adresses au profil du fournisseur. Pour une connexion, un seul profil actif doit mentionner ce domaine. Pli vérifie ensuite l’adresse complète et le secret auprès de son serveur IMAP, sous TLS. Au premier succès, il crée le profil utilisateur et la boîte rattachée. Les connexions suivantes retrouvent la même boîte. Pour la recette locale, lancez `make bench-up`, activez le profil de test et enregistrez « Banc local » pour `recette.test`.
+
+| Méthode | Opération sur `/api/v1/session` |
+| --- | --- |
+| `POST` | Reçoit `{"address":"alice@recette.test","password":"alice-test"}` (exemple du banc). Renvoie `account_id`, `address` et `expires_at` (secondes Unix) et pose le cookie de session. Un refus d’identification donne `401 identifiants_invalides`. Une panne IMAP, TLS ou de stockage donne `503 service_indisponible`. |
+| `GET` | Renvoie la boîte attachée au cookie. Une session absente, expirée ou fermée donne `401 session_expiree`. |
+| `DELETE` | Révoque la session en base, efface le cookie et renvoie `204`. |
+
+Le cookie est propre à l’hôte, `Secure`, `HttpOnly` et `SameSite=Strict`. Servez Pli en HTTPS en déploiement et utilisez l’adresse de bouclage en développement. SQLite conserve l’empreinte SHA-256 du jeton et le secret IMAP chiffré en AES-256-GCM. Le chiffrement associe le secret à l’adresse et au profil serveur. Sauvegardez la clé séparément de la base pour pouvoir relire les secrets après restauration.
+
+**Isolation des boîtes.** Chaque route de données de courrier reçoit l’extracteur Axum `CompteAuthentifie`. Ses lectures et écritures filtrent sur `account_id` issu de cette session, y compris lors d’un accès par identifiant de ressource. L’API de santé est publique. L’administration utilise son propre jeton.
 
 ## Structure
 

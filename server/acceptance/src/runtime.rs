@@ -8,12 +8,17 @@ use crate::{
     steps::{Problem, World},
 };
 
-async fn run_case<'a>(steps: impl Iterator<Item = &'a Step>, row: &Example) -> Result<(), Problem> {
+async fn run_case<'a>(
+    steps: impl Iterator<Item = &'a Step>,
+    row: &Example,
+    journal: Option<&Path>,
+) -> Result<(), Problem> {
     let directory = tempfile::tempdir().map_err(Problem::infra)?;
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .await
         .map_err(Problem::infra)?;
     let mut world = World::new(listener.local_addr().map_err(Problem::infra)?)?;
+    world.recordings = journal.map(|log| (directory.path().to_owned(), log.to_owned()));
     let scenario = async {
         for step in steps {
             world.step(&step.text, row).await.map_err(|e| match e {
@@ -31,7 +36,7 @@ async fn run_case<'a>(steps: impl Iterator<Item = &'a Step>, row: &Example) -> R
     }
 }
 
-pub async fn run(entry: &Path) -> Result<bool, Error> {
+pub async fn run(entry: &Path, journal: &Path) -> Result<bool, Error> {
     let entry = Entrypoint::load(entry)?;
     let ir = env::var_os(IR_ENV).map(Into::into).unwrap_or(entry.ir_path);
     let feature = Feature::load(&ir)?;
@@ -44,7 +49,13 @@ pub async fn run(entry: &Path) -> Result<bool, Error> {
         let scenario = &feature.scenarios[index];
         let name = format!("{} / {} / exemple {}", feature.name, scenario.name, row + 1);
         let steps = feature.background.iter().chain(&scenario.steps);
-        match run_case(steps, scenario.examples.get(row).unwrap_or(&empty)).await {
+        match run_case(
+            steps,
+            scenario.examples.get(row).unwrap_or(&empty),
+            Some(journal),
+        )
+        .await
+        {
             Ok(()) => println!("OK   {name}"),
             Err(Problem::Step(message)) => {
                 eprintln!("ÉCHEC   {name} — {message}");
@@ -80,10 +91,10 @@ mod tests {
             ("http".into(), "200".into()),
             ("etat_recu".into(), "ok".into()),
         ]);
-        run_case(background.iter().chain(&assertions), &row)
+        run_case(background.iter().chain(&assertions), &row, None)
             .await
             .unwrap();
-        let error = run_case(assertions.iter(), &row).await.unwrap_err();
+        let error = run_case(assertions.iter(), &row, None).await.unwrap_err();
         assert!(matches!(error, Problem::Step(msg) if msg.contains("Aucune réponse HTTP")));
     }
 
@@ -109,7 +120,7 @@ mod tests {
                 ("etat".into(), "indisponible".into()),
             ]);
             let scenario = steps(&["je consulte la disponibilité du webmail", text]);
-            let error = run_case(scenario.iter(), &row).await.unwrap_err();
+            let error = run_case(scenario.iter(), &row, None).await.unwrap_err();
             assert!(
                 matches!(error, Problem::Step(msg) if msg.contains(text) && msg.contains(reason))
             );

@@ -123,15 +123,75 @@ async fn resolve(ep: &Endpoint) -> io::Result<Vec<SocketAddr>> {
     Ok(addresses)
 }
 
-async fn imap_greeting<T>(client: &mut ImapClient<T>) -> Result<(), Error>
+async fn imap_greeting<T>(client: &mut ImapClient<T>) -> async_imap::error::Result<()>
 where
     T: AsyncRead + AsyncWrite + Unpin + Send + std::fmt::Debug,
 {
     client
         .read_response()
         .await?
-        .ok_or("Bannière IMAP absente")?;
+        .ok_or(async_imap::error::Error::ConnectionLost)?;
     Ok(())
+}
+
+pub(crate) enum LoginFailure {
+    InvalidCredentials,
+    Unavailable,
+}
+
+async fn imap_login(
+    stream: TlsStream<TcpStream>,
+    mode: TlsMode,
+    username: &str,
+    password: &str,
+) -> async_imap::error::Result<()> {
+    let mut client = ImapClient::new(stream);
+    if mode == TlsMode::Implicit {
+        imap_greeting(&mut client).await?;
+    }
+    client.login(username, password).await.map_err(|(e, _)| e)?;
+    Ok(())
+}
+
+fn login_failure(error: async_imap::error::Error) -> LoginFailure {
+    use async_imap::error::Error as ImapError;
+    match error {
+        ImapError::No(detail) => {
+            // async-imap 0.12 enveloppe les codes RFC 5530 non typés dans le texte de NO.
+            let code = detail
+                .split_once("info: Some(\"[")
+                .and_then(|(_, info)| info.split_once(']'))
+                .map(|(code, _)| code);
+            match code.map(str::to_ascii_uppercase).as_deref() {
+                Some("UNAVAILABLE" | "SERVERBUG" | "CONTACTADMIN") => LoginFailure::Unavailable,
+                _ => LoginFailure::InvalidCredentials,
+            }
+        }
+        ImapError::Validate(_) => LoginFailure::InvalidCredentials,
+        _ => LoginFailure::Unavailable,
+    }
+}
+
+pub(crate) async fn login_mailbox(
+    profile: &Profile,
+    address: &str,
+    password: &str,
+) -> Result<(), LoginFailure> {
+    let ep = &profile.imap;
+    timeout(STEP_TIMEOUT, async {
+        let tcp = TcpStream::connect((ep.host.as_str(), ep.port))
+            .await
+            .map_err(|_| LoginFailure::Unavailable)?;
+        let tls = Protocol::Imap
+            .secure(tcp, ep, profile.local_test)
+            .await
+            .map_err(|_| LoginFailure::Unavailable)?;
+        imap_login(tls, ep.tls, address, password)
+            .await
+            .map_err(login_failure)
+    })
+    .await
+    .map_err(|_| LoginFailure::Unavailable)?
 }
 
 fn smtp_client<T: AsyncRead + AsyncWrite>(stream: T) -> SmtpClient<T> {
@@ -189,14 +249,7 @@ impl Protocol {
     ) -> Result<(), Error> {
         match self {
             Self::Imap => {
-                let mut client = ImapClient::new(stream);
-                if mode == TlsMode::Implicit {
-                    imap_greeting(&mut client).await?;
-                }
-                client
-                    .login(&credentials.username, &credentials.password)
-                    .await
-                    .map_err(|(e, _)| e)?;
+                imap_login(stream, mode, &credentials.username, &credentials.password).await?;
             }
             Self::Smtp => {
                 let mut client = smtp_client(stream);

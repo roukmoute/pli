@@ -13,5 +13,8 @@ trap 'exit 143' TERM
 python3 -B -m unittest discover -s bench
 python3 bench/seed.py base
 address=$("${compose[@]}" port greenmail 3143)
-PLI_BENCH_IMAP_PORT=${address##*:} cargo test --manifest-path server/Cargo.toml \
+imap_tls=$("${compose[@]}" port greenmail 3993)
+smtp_tls=$("${compose[@]}" port greenmail 3465)
+export PLI_BENCH_IMAP_PORT=${address##*:} PLI_BENCH_IMAPS_PORT=${imap_tls##*:} PLI_BENCH_SMTPS_PORT=${smtp_tls##*:}
+cargo test --manifest-path server/Cargo.toml \
     --locked --workspace --tests -- --ignored greenmail_

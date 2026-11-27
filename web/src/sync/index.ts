@@ -1,6 +1,8 @@
 import { getJson } from "./api";
 
+export { ApiError, onSessionExpired } from "./api";
 export * from "./servers";
+export * from "./session";
 
 export interface ServiceHealth {
   status: "ok";

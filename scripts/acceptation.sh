@@ -25,13 +25,16 @@ cible=${CARGO_TARGET_DIR:-server/target}
 cargo build --manifest-path server/Cargo.toml --locked -p pli-acceptance --bins --target-dir "$cible"
 export PATH="$(cd "$cible/debug" && pwd):$PATH"
 unset PLI_ACCEPTANCE_IR
+export WEBMAIL_SECRET_KEY
+WEBMAIL_SECRET_KEY=$(openssl rand -hex 32)
+export WEBMAIL_SESSION_TTL_SECONDS=3
 mkdir -p build/acceptance/{ir,dry}
 
 # Un seul banc sans messages pour la suite et ses mutations. Les ports publiés
 # sont attribués par Docker, y compris si plusieurs suites tournent en parallèle.
 if [[ -z ${PLI_APS_IMAPS_PORT:-} && -z ${PLI_APS_SMTPS_PORT:-} ]]; then
     banc=$(docker run --rm -d -p 127.0.0.1::3993 -p 127.0.0.1::3465 \
-        -e 'GREENMAIL_OPTS=-Dgreenmail.setup.test.imaps -Dgreenmail.setup.test.smtps -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=diagnostic:essai-local@recette.test' \
+        -e 'GREENMAIL_OPTS=-Dgreenmail.setup.test.imaps -Dgreenmail.setup.test.smtps -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users.login=email -Dgreenmail.users=alice:alice-test@recette.test,bob:bob-test@recette.test' \
         greenmail/standalone:2.1.15)
     trap 'docker stop "$banc" >/dev/null' EXIT
     adresse_imap=$(docker port "$banc" 3993/tcp)

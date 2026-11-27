@@ -14,10 +14,11 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
 };
 
-use crate::{AdminConfig, Error, admin, db::Database};
+use crate::{AdminConfig, Error, admin, db::Database, session};
 
-pub fn router(db: Arc<Database>, config: AdminConfig) -> Router {
+pub fn router(db: Arc<Database>, config: AdminConfig, sessions: session::SessionConfig) -> Router {
     let api = Router::new()
+        .merge(session::router(db.clone(), sessions, config.allow_test))
         .nest("/admin/v1", admin::router(db.clone(), config))
         .route("/v1/health", get(health))
         .fallback(async || api_error(StatusCode::NOT_FOUND, "not_found", "Route API inconnue."))

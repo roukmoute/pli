@@ -8,14 +8,10 @@ use tokio::{
     net::TcpListener,
     task::JoinHandle,
 };
-use tokio_rustls::{
-    TlsAcceptor,
-    rustls::{ServerConfig, pki_types::PrivatePkcs8KeyDer},
-};
 use tower::ServiceExt;
 
 use super::*;
-use crate::test_support::TestApp;
+use crate::test_support::{TestApp, tls_acceptor};
 
 const TOKEN: &str = "jeton-de-recette";
 const BASE: &str = "/api/admin/v1/servers";
@@ -24,6 +20,7 @@ fn configured(app: &TestApp, token: Option<&str>, local: bool) -> Router {
     crate::http::router(
         app.db.clone(),
         AdminConfig::new(token.map(str::to_owned), local),
+        crate::session::SessionConfig::parse(None, "60").unwrap(),
     )
 }
 
@@ -171,16 +168,6 @@ async fn invalid_inputs_are_rejected_without_echoing_credentials() -> Result<(),
         assert!(!result.to_string().contains("pass-test"));
     }
     Ok(())
-}
-
-fn tls_acceptor() -> TlsAcceptor {
-    let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
-    let key = PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der());
-    let config = ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(vec![cert.cert.der().clone()], key.into())
-        .unwrap();
-    TlsAcceptor::from(Arc::new(config))
 }
 
 // These peers assert the exact commands on either side of the TLS handshake.

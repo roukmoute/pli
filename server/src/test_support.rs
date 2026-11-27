@@ -1,6 +1,11 @@
 use std::sync::Arc;
 
 use axum::Router;
+use tokio_rustls::{
+    TlsAcceptor,
+    rustls::{ServerConfig, pki_types::PrivatePkcs8KeyDer},
+};
+
 use tempfile::TempDir;
 
 use crate::{Error, db::Database, http};
@@ -26,6 +31,20 @@ impl TestApp {
     }
 
     pub fn router(&self) -> Router {
-        http::router(Arc::clone(&self.db), Default::default())
+        http::router(
+            Arc::clone(&self.db),
+            Default::default(),
+            crate::session::SessionConfig::parse(None, "60").unwrap(),
+        )
     }
+}
+
+pub(crate) fn tls_acceptor() -> TlsAcceptor {
+    let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    let key = PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der());
+    let config = ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(vec![cert.cert.der().clone()], key.into())
+        .unwrap();
+    TlsAcceptor::from(Arc::new(config))
 }

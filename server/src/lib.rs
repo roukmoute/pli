@@ -1,6 +1,7 @@
 mod admin;
 mod db;
 mod http;
+mod session;
 #[cfg(test)]
 mod test_support;
 
@@ -11,6 +12,17 @@ use tokio::net::TcpListener;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
+pub fn init_logging(
+    writer: impl for<'a> tracing_subscriber::fmt::MakeWriter<'a> + Send + Sync + 'static,
+) {
+    use tracing_subscriber::{filter::Targets, layer::SubscriberExt, util::SubscriberInitExt};
+    // Les traces de protocole des bibliothèques peuvent inclure les commandes de connexion.
+    tracing_subscriber::registry()
+        .with(Targets::new().with_target("webmail_server", tracing::Level::INFO))
+        .with(tracing_subscriber::fmt::layer().with_writer(writer))
+        .init();
+}
+
 pub async fn serve(listener: TcpListener, data_dir: &Path) -> Result<(), Error> {
     serve_with_admin(listener, data_dir, AdminConfig::from_env()).await
 }
@@ -20,8 +32,9 @@ pub async fn serve_with_admin(
     data_dir: &Path,
     admin: AdminConfig,
 ) -> Result<(), Error> {
+    let sessions = session::SessionConfig::from_env()?;
     let db = Arc::new(db::Database::open(data_dir)?);
     tracing::info!(address = %listener.local_addr()?, "Serveur prêt");
-    axum::serve(listener, http::router(db, admin)).await?;
+    axum::serve(listener, http::router(db, admin, sessions)).await?;
     Ok(())
 }

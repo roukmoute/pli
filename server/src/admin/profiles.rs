@@ -11,7 +11,7 @@ use crate::Error;
 
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(super) enum TlsMode {
+pub(crate) enum TlsMode {
     Implicit,
     Starttls,
 }
@@ -25,8 +25,8 @@ impl TlsMode {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub(super) struct Endpoint {
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct Endpoint {
     pub host: String,
     pub port: u16,
     pub tls: TlsMode,
@@ -50,8 +50,8 @@ impl Endpoint {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub(super) struct Profile {
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct Profile {
     pub name: String,
     pub imap: Endpoint,
     pub smtp: Endpoint,
@@ -61,8 +61,8 @@ pub(super) struct Profile {
     pub local_test: bool,
 }
 
-#[derive(Serialize)]
-pub(super) struct Server {
+#[derive(PartialEq, Serialize)]
+pub(crate) struct Server {
     pub id: i64,
     #[serde(flatten)]
     pub profile: Profile,
@@ -161,6 +161,19 @@ pub(super) fn list(db: &Connection) -> rusqlite::Result<Vec<Server>> {
     ))?
     .query_map([], read_server)?
     .collect()
+}
+
+pub(crate) fn for_domain(db: &Connection, domain: &str) -> Result<Option<Server>, Error> {
+    let mut statement = db.prepare(&format!(
+        "SELECT {COLUMNS} FROM server_profiles
+         WHERE active = 1 AND EXISTS (SELECT 1 FROM json_each(domains) WHERE value = ?1 COLLATE NOCASE)"
+    ))?;
+    let mut matches = statement.query_map([domain], read_server)?;
+    let server = matches.next().transpose()?;
+    if matches.next().is_some() {
+        return Err("Plusieurs profils actifs correspondent au domaine.".into());
+    }
+    Ok(server)
 }
 
 pub(super) fn save(

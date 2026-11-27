@@ -5,12 +5,12 @@ use tokio::net::TcpSocket;
 
 use super::{Example, Problem, StatusCode, TOKEN, World, example_value, expect, parameter};
 
-fn bench_port(var: &str, default: u16) -> Result<u16, Problem> {
+pub(super) fn bench_port(var: &str, default: u16) -> Result<u16, Problem> {
     env::var(var).map_or(Ok(default), |port| port.parse().map_err(Problem::infra))
 }
 
 fn candidate(profile: Value) -> Value {
-    json!({"profile": profile, "credentials":{"username":"diagnostic", "password":"essai-local"}})
+    json!({"profile": profile, "credentials":{"username":"alice@recette.test", "password":"alice-test"}})
 }
 
 fn local_profile(catalog: &Value) -> Result<Value, Problem> {
@@ -35,10 +35,15 @@ impl World {
     }
 
     async fn install_bench(&mut self) -> Result<(), Problem> {
+        self.install_bench_at(bench_port("PLI_APS_IMAPS_PORT", 3993)?)
+            .await
+    }
+
+    pub(super) async fn install_bench_at(&mut self, imap_port: u16) -> Result<(), Problem> {
         self.send(self.client.get(self.servers_url()).bearer_auth(TOKEN))
             .await?;
         let mut profile = local_profile(&self.json()?)?;
-        profile["imap"]["port"] = json!(bench_port("PLI_APS_IMAPS_PORT", 3993)?);
+        profile["imap"]["port"] = json!(imap_port);
         profile["smtp"]["port"] = json!(bench_port("PLI_APS_SMTPS_PORT", 3465)?);
         self.send(
             self.client
