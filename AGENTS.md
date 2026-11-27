@@ -44,3 +44,55 @@ Si un autre agent a poussé entre-temps et que le push est refusé, répétez ce
 Quand tous les critères de la carte sont remplis et tous ses commits poussés, lancez `scripts/version.sh` une seule fois, juste avant la remise en validation. Exécutez-le depuis un arbre propre sur `main`, au même commit que `origin/main`. Si le tableau Kanban est en cours de modification dans le dossier partagé, un clone propre de ce même commit convient.
 
 Le script crée le tag annoté suivant (`v0.1.0`, puis `v0.2.0`, etc.), le pousse et publie la Release GitHub publique avec les notes générées par GitHub. Inscrivez la version affichée dans le journal de la carte.
+
+## Règles de conception
+
+### TypeScript
+
+Composez les objets avec des fonctions et passez leurs dépendances en paramètres. Représentez les variantes d’un même type par une union discriminée. La seule forme d’héritage de classe autorisée est `extends Error` pour une classe d’erreur, comme `ApiError`. Depuis la racine, `npm --prefix web run lint` vérifie cette règle.
+
+```ts
+// À éviter
+class Compteur extends DepotMessages {
+  total() {
+    return this.compterNonLus();
+  }
+}
+
+// À faire
+function creerCompteur(compterNonLus: () => number) {
+  return { total: compterNonLus };
+}
+```
+
+### Rust
+
+Limitez chaque trait aux opérations dont son appelant a besoin. Passez les dépendances au constructeur, stockez-les dans des champs et déléguez-leur les opérations. N’utilisez pas `Deref` pour simuler l’héritage.
+
+```rust
+// À éviter
+// Ce trait impose aussi l’envoi aux implémentations utilisées par le compteur.
+trait Messagerie {
+    fn compter_non_lus(&self) -> usize;
+    fn envoyer(&self, texte: &str);
+}
+
+// À faire
+trait LectureNonLus {
+    fn compter_non_lus(&self) -> usize;
+}
+
+struct Compteur<L> {
+    lecture: L,
+}
+
+impl<L: LectureNonLus> Compteur<L> {
+    fn new(lecture: L) -> Self {
+        Self { lecture }
+    }
+
+    fn total(&self) -> usize {
+        self.lecture.compter_non_lus()
+    }
+}
+```

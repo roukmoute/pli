@@ -1,0 +1,5 @@
+language js
+
+JsExtendsClause(super_class=not `Error`) as $clause where {
+  register_diagnostic(span=$clause, message="Composez les objets. Seules les classes d’erreur peuvent étendre directement Error.", severity="error")
+}
