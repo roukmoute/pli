@@ -51,6 +51,16 @@ Depuis la racine, `make test` prépare les dépendances et lance les deux suites
 | --- | --- | --- |
 | `WEBMAIL_LISTEN` | `127.0.0.1:8080` | Adresse d’écoute du serveur et cible du proxy de développement. |
 | `WEBMAIL_DATA_DIR` | `./data` | Répertoire local qui accueille `webmail.db` et les fichiers WAL. Il est créé au démarrage. |
+| `WEBMAIL_ADMIN_TOKEN` | vide | Jeton à saisir sur `/admin`. L’accès à l’administration exige un jeton configuré côté serveur. |
+| `WEBMAIL_ALLOW_TEST_PROFILE` | `0` | La valeur `1` autorise le profil GreenMail local avec certificat de test sur une IP de bouclage. |
+
+Sur `/admin`, ouvrez l’administration puis choisissez **Ajouter un serveur**. Le préréglage Infomaniak utilise `mail.infomaniak.com`, IMAP 993 en TLS implicite et SMTP 587 en STARTTLS. Le banc local propose IMAPS 3993 et SMTPS 3465. Les ports sont modifiables.
+
+**Tester** affiche la résolution DNS, la connexion TCP, la négociation TLS et l’authentification pour chaque protocole. **Tester et enregistrer** applique le profil après la réussite des deux authentifications. Les identifiants servent uniquement à cette requête. Le diagnostic ne lit ni n’envoie de message.
+
+L’API d’administration utilise l’en-tête `Authorization: Bearer <jeton>`. `GET /api/admin/v1/servers` renvoie les serveurs et les préréglages. `POST /api/admin/v1/servers/test` teste un candidat. `POST /api/admin/v1/servers` le crée et `PUT /api/admin/v1/servers/{id}` le modifie. Ces trois opérations reçoivent un objet JSON contenant `profile` (même structure qu’un préréglage) et `credentials` (champs `username` et `password`). Une sauvegarde refusée renvoie le diagnostic avec le statut HTTP 422 et conserve le profil en service.
+
+Les scénarios de `scripts/acceptation.sh` démarrent un GreenMail Docker temporaire et attendent son démarrage avec OpenSSL. Pour réutiliser un banc local déjà lancé, exportez ses deux ports dans `PLI_APS_IMAPS_PORT` et `PLI_APS_SMTPS_PORT`. Le scénario utilise le compte fictif `diagnostic` avec le mot de passe de recette `essai-local`.
 
 Make génère `.env.example` à partir de `config/example.env`. La commande `make .env.example` permet aussi de le préparer seul. Pour utiliser vos valeurs dans le terminal courant, copiez le modèle dans `.env`, modifiez-le, puis exportez ses variables avant de lancer le service.
 

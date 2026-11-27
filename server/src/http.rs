@@ -9,12 +9,16 @@ use axum::{
     routing::get,
 };
 use serde::Serialize;
-use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    set_header::SetResponseHeaderLayer,
+};
 
-use crate::{Error, db::Database};
+use crate::{AdminConfig, Error, admin, db::Database};
 
-pub fn router(db: Arc<Database>) -> Router {
+pub fn router(db: Arc<Database>, config: AdminConfig) -> Router {
     let api = Router::new()
+        .nest("/admin/v1", admin::router(db.clone(), config))
         .route("/v1/health", get(health))
         .fallback(async || api_error(StatusCode::NOT_FOUND, "not_found", "Route API inconnue."))
         .method_not_allowed_fallback(async || {
@@ -30,6 +34,8 @@ pub fn router(db: Arc<Database>) -> Router {
         ))
         .with_state(db);
     let files = Router::new()
+        .route_service("/admin", ServeFile::new("web/dist/index.html"))
+        .route_service("/admin/", ServeFile::new("web/dist/index.html"))
         .fallback_service(ServeDir::new("web/dist"))
         .layer(middleware::from_fn(cache_static));
     Router::new().nest("/api", api).fallback_service(files)
@@ -41,19 +47,19 @@ struct Health {
 }
 
 #[derive(Serialize)]
-struct ErrorBody {
+pub(crate) struct ErrorBody {
     code: &'static str,
     message: &'static str,
 }
 
-type ApiError = (StatusCode, Json<ErrorBody>);
+pub(crate) type ApiError = (StatusCode, Json<ErrorBody>);
 
-fn api_error(status: StatusCode, code: &'static str, message: &'static str) -> ApiError {
+pub(crate) fn api_error(status: StatusCode, code: &'static str, message: &'static str) -> ApiError {
     (status, Json(ErrorBody { code, message }))
 }
 
-fn unavailable(error: impl Display) -> ApiError {
-    tracing::error!(%error, "Échec de la lecture SQLite");
+pub(crate) fn unavailable(error: impl Display) -> ApiError {
+    tracing::error!(%error, "Accès SQLite indisponible");
     api_error(
         StatusCode::SERVICE_UNAVAILABLE,
         "database_unavailable",

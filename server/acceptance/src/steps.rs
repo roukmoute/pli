@@ -1,9 +1,16 @@
 use std::{fmt::Display, net::SocketAddr, time::Duration};
 
-use reqwest::{Client, StatusCode};
+use reqwest::{Client, RequestBuilder, StatusCode};
 use serde_json::Value;
 
 use crate::{Error, Example};
+mod profiles;
+
+const TOKEN: &str = "jeton-fictif-acceptation";
+
+pub(crate) fn admin_config() -> webmail_server::AdminConfig {
+    webmail_server::AdminConfig::new(Some(TOKEN.into()), true)
+}
 
 #[derive(Debug)]
 pub(crate) enum Problem {
@@ -43,28 +50,37 @@ impl World {
             .ok_or_else(|| Problem::Step("Aucune réponse HTTP à vérifier".into()))
     }
 
+    async fn send(&mut self, request: RequestBuilder) -> Result<(), Problem> {
+        let response = request.send().await.map_err(Problem::infra)?;
+        self.response = Some((
+            response.status(),
+            response.text().await.map_err(Problem::infra)?,
+        ));
+        Ok(())
+    }
+
+    fn json(&self) -> Result<Value, Problem> {
+        serde_json::from_str(&self.response()?.1)
+            .map_err(|e| Problem::Step(format!("Réponse JSON invalide : {e}")))
+    }
+
     pub async fn step(&mut self, text: &str, example: &Example) -> Result<(), Problem> {
         if text == "je consulte la disponibilité du webmail" {
             let url = format!("http://{}/api/v1/health", self.address);
-            let response = self.client.get(url).send().await.map_err(Problem::infra)?;
-            self.response = Some((
-                response.status(),
-                response.text().await.map_err(Problem::infra)?,
-            ));
+            self.send(self.client.get(url)).await?;
         } else if let Some(key) = parameter(text, "le service répond avec le code ") {
             let value = example_value(example, key)?;
             let code = StatusCode::from_bytes(value.as_bytes())
                 .map_err(|_| Problem::Step(format!("Code HTTP invalide : {value}")))?;
             expect(self.response()?.0, code)?;
         } else if let Some(key) = parameter(text, "l’état annoncé est ") {
-            let body: Value = serde_json::from_str(&self.response()?.1)
-                .map_err(|e| Problem::Step(format!("Réponse JSON invalide : {e}")))?;
+            let body = self.json()?;
             let state = body["status"]
                 .as_str()
                 .ok_or_else(|| Problem::Step("La réponse ne contient pas d’état textuel".into()))?;
             expect(state, example_value(example, key)?)?;
         } else {
-            return Err(Problem::Step("Étape sans implémentation".into()));
+            self.profile_step(text, example).await?;
         }
         Ok(())
     }

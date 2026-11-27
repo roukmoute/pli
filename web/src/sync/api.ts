@@ -8,7 +8,7 @@ export class ApiError extends Error {
   }
 }
 
-function responseError(status: number, body: unknown): ApiError {
+export function responseError(status: number, body: unknown): ApiError {
   if (
     typeof body === "object" &&
     body !== null &&

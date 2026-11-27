@@ -1,5 +1,7 @@
 import { getJson } from "./api";
 
+export * from "./servers";
+
 export interface ServiceHealth {
   status: "ok";
 }

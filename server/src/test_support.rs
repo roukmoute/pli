@@ -26,6 +26,6 @@ impl TestApp {
     }
 
     pub fn router(&self) -> Router {
-        http::router(Arc::clone(&self.db))
+        http::router(Arc::clone(&self.db), Default::default())
     }
 }

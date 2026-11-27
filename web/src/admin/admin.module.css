@@ -1,0 +1,102 @@
+.panel label {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.85rem 0;
+  font-weight: 550;
+}
+
+.panel input:not([type="checkbox"]),
+.panel select {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #9491a5;
+  border-radius: 0.4rem;
+  padding: 0.48rem 0.6rem;
+  color: inherit;
+  background: white;
+  font: inherit;
+}
+
+.panel :focus-visible {
+  outline: 3px solid #6657ba;
+  outline-offset: 2px;
+}
+.panel button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.panel button.secondary {
+  color: #403693;
+  background: #efedf8;
+}
+.panel .check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.controls {
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.protocols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  gap: 0.75rem;
+}
+.protocol {
+  min-width: 0;
+  margin: 0.75rem 0 0;
+  border: 1px solid #dddce7;
+  border-radius: 0.6rem;
+}
+.protocol legend,
+.results caption {
+  font-weight: 650;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+.results {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+.results caption {
+  text-align: left;
+  margin-bottom: 0.5rem;
+}
+.results td,
+.results th {
+  padding: 0.5rem 0.2rem;
+  border-bottom: 1px solid #dddce7;
+  text-align: left;
+}
+.results [data-status="failed"] {
+  color: #982a34;
+  font-weight: 650;
+}
+.results [data-status="ok"] {
+  color: #11624f;
+}
+.servers {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+}
+.servers li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #dddce7;
+  overflow-wrap: anywhere;
+}
+.servers button {
+  margin-top: 0;
+}

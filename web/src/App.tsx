@@ -1,5 +1,6 @@
 import { createMemo, Errored, Loading } from "solid-js";
 import styles from "./App.module.css";
+import Admin from "./admin/Admin";
 import { getServiceHealth } from "./sync";
 
 function ServiceStatus() {
@@ -12,6 +13,8 @@ function ServiceStatus() {
 }
 
 export default function App() {
+  if (["/admin", "/admin/"].includes(window.location.pathname))
+    return <Admin />;
   return (
     <main class={styles.page}>
       <h1 class={styles.brand}>Pli</h1>

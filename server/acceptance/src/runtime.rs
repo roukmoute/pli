@@ -24,7 +24,7 @@ async fn run_case<'a>(steps: impl Iterator<Item = &'a Step>, row: &Example) -> R
         Ok(())
     };
     tokio::select! {
-        result = webmail_server::serve(listener, directory.path()) => {
+        result = webmail_server::serve_with_admin(listener, directory.path(), crate::steps::admin_config()) => {
             Err(Problem::infra(result.err().unwrap_or_else(|| "Le service s’est arrêté".into())))
         }
         result = scenario => result,
