@@ -25,15 +25,16 @@ muter() {
     make web/node_modules/.installed
     # Un worker réutilise sa compilation Rust. Chaque site sélectionné est
     # rejoué, même si seuls les tests ont changé ou si la ligne est non couverte.
-    PLI_MUTATION_WEB="$PWD/web" "$outils/venv/bin/mutator" \
-        --no-coverage --mutate-all --max-workers 1 "$@"
+    PLI_MUTATION_WEB="$PWD/web" "$outils/venv/bin/python" -u scripts/mutations.py "$@"
 }
 
 fichiers_modifies() {
     local tag
-    if tag=$(git describe --tags --abbrev=0 2>/dev/null); then
+    if tag=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null); then
+        echo "Base de mutation : $tag ($(git rev-parse "$tag^{commit}"))" >&2
         git diff --name-only --no-renames --diff-filter=ACMT -z "$tag" -- "${sources[@]}" || return
     else
+        echo "Base de mutation : aucun tag de version accessible, toutes les sources." >&2
         git ls-files --cached -z -- "${sources[@]}" || return
     fi
     git ls-files --others --exclude-standard -z -- "${sources[@]}"

@@ -1,0 +1,51 @@
+# Revue du socle 4b54fb1, carte kjdx6zusm. Chaque clé précise la ligne,
+# la colonne en octets (à partir de 1) et le remplacement exact.
+
+["server/src/admin/tests/mod.rs"]
+sha256 = "a72122c56c919c641d6023b31a53cba6e3274af5fc33c29fb4d1c9dd286ffeea"
+["server/src/admin/tests/mod.rs".sites]
+"79:46 false -> true" = "La permission du banc ne change pas le contrôle vérifié."
+"153:48 false -> true" = "La permission du banc ne change pas le contrôle vérifié."
+"265:40 delete !" = "Le faux serveur et le client changent ensemble de mode TLS."
+"282:59 true -> false" = "Le faux serveur et le client changent ensemble de mode TLS."
+"287:73 true -> false" = "Le faux serveur et le client changent ensemble de mode TLS."
+"294:30 true -> false" = "Les deux authentifications sont refusées et chaque résultat simulé est vérifié."
+"294:38 true -> false" = "Les deux authentifications sont refusées et chaque résultat simulé est vérifié."
+"296:59 false -> true" = "Le faux serveur et le client changent ensemble de mode TLS."
+"308:55 false -> true" = "Le faux serveur et le client changent ensemble de mode TLS."
+"315:57 true -> false" = "Le faux serveur et le client changent ensemble de mode TLS."
+"323:53 true -> false" = "La permission du banc ne change pas le contrôle vérifié."
+"335:58 true -> false" = "Le faux serveur et le client changent ensemble de mode TLS."
+
+["server/src/session/secret.rs"]
+sha256 = "b85bf5453b8c04c960f94a53c9c70fca0227134128cf30afb589b15b341ea223"
+["server/src/session/secret.rs".sites]
+"43:22 0 -> 1" = "Le générateur aléatoire remplit tout le nonce avant sa première lecture."
+
+["server/src/session/tests/folders.rs"]
+sha256 = "b3057706fc16936c56c4bff741cee73fa802353a3efe062c8f4f91047c79018f"
+["server/src/session/tests/folders.rs".sites]
+"54:50 false -> true" = "Le serveur présente seulement INBOX dans les deux modes SPECIAL-USE."
+"77:45 1 -> 0" = "Les deux numéros de profil sont invalides pour ce chiffré."
+"80:27 1 -> 0" = "Les cinq octets restent trop courts pour être déchiffrés."
+"80:43 0 -> 1" = "Les cinq octets restent trop courts pour être déchiffrés."
+"189:42 true -> false" = "LIST échoue dans les deux modes SPECIAL-USE."
+"227:37 false -> true" = "L’écriture du repère échoue dans les deux modes SPECIAL-USE."
+
+["server/src/session/tests/headers.rs"]
+sha256 = "46827ac5a909250865abae7b85f377e4059a161127130b4d4b2659f2e6bcb1cb"
+["server/src/session/tests/headers.rs".sites]
+"49:43 false -> true" = "L’annonce SPECIAL-USE et la commande LIST attendue varient ensemble pour INBOX seule."
+"51:18 1 -> 0" = "L’UID 0 ajouté à SEARCH est en dehors de la plage vérifiée."
+
+["server/src/session/tests/mod.rs"]
+sha256 = "e9d5b29dc577026d53023e18f0d2a3059b1c6a8b9b4fcde99fd3c04b09c7369e"
+["server/src/session/tests/mod.rs".sites]
+"342:22 true -> false" = "La clé absente suffit à refuser la session quelle que soit la permission du banc."
+"386:28 1 -> 0" = "Les deux valeurs de remplissage produisent une clé valide de 32 octets."
+
+["web/src/admin/ProfileForm.tsx"]
+sha256 = "4048540733f184fbf82d94c49c52d3bd9812e15111e67b5384b507177df19345"
+["web/src/admin/ProfileForm.tsx".sites]
+"46:54 ?? -> ||" = "Le FormData vide redonne une chaîne vide avec les deux opérateurs."
+"78:24 ?? -> ||" = "Le profil vaut un objet ou est absent. Les deux opérateurs choisissent le même préréglage."

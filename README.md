@@ -35,6 +35,8 @@ Le job `integration` du même workflow vérifie le jeu de 20 messages avec Docke
 
 ## Écrire et lancer un test
 
+`scripts/qualite.sh mutation` affiche le tag de départ et rejoue chaque site sélectionné. Les tests d’intégration utilisent un GreenMail jetable. Une équivalence documentée vaut pour une empreinte du fichier, une position et un remplacement précis. Si le fichier change, toute mutation encore survivante demande une nouvelle revue. Le code de sortie 2 signale un témoin en échec et le code 3 un survivant sans justification. [Équivalences examinées](scripts/mutations-equivalentes.toml)
+
 **Rust.** Ajoutez un `#[test]` au module `tests` du fichier concerné. Pour tester une route, utilisez `#[tokio::test]`. L’instance créée par `let app = crate::test_support::TestApp::new()?;` conserve la base SQLite temporaire migrée, accessible par `app.db`, pendant toute sa portée. Importez `tower::ServiceExt` pour appeler le routeur en mémoire avec `app.router().oneshot(request).await?`. [Exemple de test HTTP](server/src/http.rs)
 
 **Front.** Placez un fichier `*.test.tsx` à côté du composant ou `*.test.ts` à côté du module. Montez un composant avec `render` et attendez le texte affiché avec `findByText`. Pour le client HTTP, simulez `fetch` avec `vi.stubGlobal`. Vitest utilise jsdom, nettoie les composants montés et restaure les variables globales simulées entre les tests. [Test du composant](web/src/App.test.tsx) · [Test du client HTTP](web/src/sync/api.test.ts)
