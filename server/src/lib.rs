@@ -1,6 +1,7 @@
 mod admin;
 mod db;
 mod http;
+mod pages;
 mod session;
 mod sync;
 #[cfg(test)]

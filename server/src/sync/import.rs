@@ -52,12 +52,45 @@ fn uid_search(start: u32, end: u32) -> Option<String> {
     (start < end).then(|| format!("UID SEARCH UID {start}:{}", end - 1))
 }
 
+fn plan_history(
+    db: &Database,
+    mailbox: &Mailbox,
+    end: u32,
+    mut remote: Vec<u32>,
+) -> Result<Vec<u32>, Error> {
+    remote.sort_unstable();
+    remote.dedup();
+    let mut writer = db.writer()?;
+    let tx = writer.transaction()?;
+    let pending = messages::missing(&tx, mailbox, &remote)?;
+    let indexed = remote.len() - pending.len();
+    let changed = tx.execute(
+        "INSERT INTO folder_imports(folder_id,uidvalidity,until_uid,expected,indexed)
+         SELECT id,uidvalidity,?3,?4,?5 FROM folders WHERE id=?1 AND uidvalidity=?2
+         ON CONFLICT(folder_id) DO UPDATE SET uidvalidity=excluded.uidvalidity,
+         until_uid=excluded.until_uid,expected=excluded.expected,indexed=excluded.indexed",
+        rusqlite::params![
+            mailbox.folder,
+            mailbox.validity,
+            end,
+            remote.len() as i64,
+            indexed as i64
+        ],
+    )?;
+    if changed == 0 {
+        return Err("La génération IMAP du dossier a changé.".into());
+    }
+    tx.commit()?;
+    Ok(pending)
+}
+
 async fn import_range(
     db: &Arc<Database>,
     session: &mut ImapSession,
     mailbox: &Mailbox,
     start: u32,
     end: u32,
+    historique: bool,
 ) -> Result<(), Error> {
     let Some(query) = uid_search(start, end) else {
         return Ok(());
@@ -73,14 +106,32 @@ async fn import_range(
     .await?;
     let reader = db.clone();
     let scope = mailbox.clone();
-    let pending =
-        spawn_blocking(move || messages::missing(&*reader.reader()?, &scope, &remote)).await??;
+    let pending = spawn_blocking(move || -> Result<_, Error> {
+        if historique {
+            plan_history(&reader, &scope, end, remote)
+        } else {
+            messages::missing(&*reader.reader()?, &scope, &remote)
+        }
+    })
+    .await??;
     for ids in pending.chunks(BATCH_SIZE) {
         let headers = fetch(session, ids, mailbox.local_test).await?;
         let writer = db.clone();
         let scope = mailbox.clone();
         spawn_blocking(move || messages::save_batch(&mut *writer.writer()?, &scope, &headers))
             .await??;
+    }
+    if historique {
+        // Tous les FETCH ont abouti. Un UID expurgé après SEARCH sort du total.
+        let db = db.clone();
+        let scope = mailbox.clone();
+        spawn_blocking(move || -> Result<_, Error> {
+            db.writer()?.execute(
+                "UPDATE folder_imports SET expected=indexed WHERE folder_id=?1 AND uidvalidity=?2 AND until_uid=?3",
+                rusqlite::params![scope.folder,scope.validity,end],
+            )?;
+            Ok(())
+        }).await??;
     }
     Ok(())
 }
@@ -92,7 +143,7 @@ async fn history(
 ) -> Result<(), Error> {
     for mailbox in mailboxes.iter().filter(|m| m.next > 1) {
         examine(&mut session, mailbox).await?;
-        import_range(db, &mut session, mailbox, 1, mailbox.next).await?;
+        import_range(db, &mut session, mailbox, 1, mailbox.next, true).await?;
     }
     let _ = timeout(Duration::from_secs(1), session.logout()).await;
     Ok(())
@@ -113,7 +164,7 @@ async fn arrivals(context: &Arc<Context>, inbox: &Mailbox) -> Result<(), Error> 
                 .next
                 .get(),
         };
-        import_range(&context.db, &mut session, inbox, start, end).await?;
+        import_range(&context.db, &mut session, inbox, start, end, false).await?;
         start = end;
         sleep(POLL_INTERVAL).await;
     }
@@ -135,7 +186,47 @@ pub(super) async fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::uid_search;
+    use super::{messages, plan_history, uid_search};
+    use crate::{
+        Error,
+        test_support::{BOITES_DE_TEST, TestApp},
+    };
+
+    #[test]
+    fn historique_clairseme_compte_les_uid_uniques_et_refuse_une_generation_perimee()
+    -> Result<(), Error> {
+        let app = TestApp::new()?;
+        let inbox = {
+            let db = app.db.writer()?;
+            db.execute_batch(BOITES_DE_TEST)?;
+            db.execute_batch(
+                "INSERT INTO messages(account_id,folder_id,uidvalidity,uid,thread_id,
+                recipients,subject,received_at,flags,size,has_attachments,snippet)
+                VALUES(1,1,1,4,'ancien','{}','Ancienne lettre',0,'[]',0,0,'')",
+            )?;
+            messages::mailboxes(&db, 1)?.remove(0)
+        };
+        assert_eq!(
+            plan_history(&app.db, &inbox, 200, vec![20, 4, 4, 150, 20])?,
+            [150, 20]
+        );
+        let etat = || -> Result<(i64, i64, i64), Error> {
+            Ok(app.db.reader()?.query_row(
+                "SELECT until_uid,expected,indexed FROM folder_imports WHERE folder_id=1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )?)
+        };
+        assert_eq!(etat()?, (200, 3, 1));
+        assert!(plan_history(&app.db, &inbox, 201, vec![4])?.is_empty());
+        assert_eq!(etat()?, (201, 1, 1));
+        app.db
+            .writer()?
+            .execute("UPDATE folders SET uidvalidity=2 WHERE id=1", [])?;
+        assert!(plan_history(&app.db, &inbox, 200, vec![20, 4]).is_err());
+        assert!(etat().is_err());
+        Ok(())
+    }
 
     #[test]
     fn only_requests_a_nonempty_inclusive_imap_range() {

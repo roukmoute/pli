@@ -29,6 +29,7 @@ pub fn router(
             config.allow_test,
             sync,
         ))
+        .merge(crate::pages::router())
         .route("/v1/folders", get(sync::folders))
         .route("/v1/screener", get(sync::screener))
         .nest("/admin/v1", admin::router(db.clone(), config))
