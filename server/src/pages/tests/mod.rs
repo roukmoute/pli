@@ -1,5 +1,6 @@
 mod pagination;
 mod projection;
+mod tri;
 
 use super::*;
 use axum::{
@@ -62,14 +63,22 @@ async fn reponse(
     path: &str,
     compte: Option<u8>,
 ) -> Result<(StatusCode, Value), Error> {
-    let mut request = Request::get(path);
+    requete(router, Request::get(path), compte, Body::empty()).await
+}
+
+async fn requete(
+    router: &Router,
+    mut request: axum::http::request::Builder,
+    compte: Option<u8>,
+    body: Body,
+) -> Result<(StatusCode, Value), Error> {
     if let Some(id) = compte {
         request = request.header(
             COOKIE,
             format!("__Host-pli_session={}", hex::encode(jeton(id))),
         );
     }
-    let res = router.clone().oneshot(request.body(Body::empty())?).await?;
+    let res = router.clone().oneshot(request.body(body)?).await?;
     let status = res.status();
     Ok((
         status,

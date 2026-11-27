@@ -1,4 +1,5 @@
 mod storage;
+pub(crate) use storage::thread as lire_resume;
 #[cfg(test)]
 mod tests;
 
@@ -66,7 +67,7 @@ struct Sender {
 }
 
 #[derive(Serialize)]
-struct Thread {
+pub(crate) struct Thread {
     id: String,
     objet: String,
     expediteur: Sender,

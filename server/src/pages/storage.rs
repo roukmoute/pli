@@ -8,7 +8,7 @@ pub(super) const SELECT_PAGE: &str = "SELECT p.item,m.subject,m.sender_name,m.se
       ON (m.account_id,m.folder_id,m.uidvalidity,m.uid)=(p.account_id,p.folder_id,p.uidvalidity,p.uid)
     WHERE p.account_id=?1 AND p.scope=?2";
 
-fn thread(row: &Row<'_>) -> rusqlite::Result<Thread> {
+pub(crate) fn thread(row: &Row<'_>) -> rusqlite::Result<Thread> {
     Ok(Thread {
         id: row.get(0)?,
         objet: row.get(1)?,

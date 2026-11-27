@@ -6,6 +6,7 @@ mod session;
 mod sync;
 #[cfg(test)]
 mod test_support;
+mod tri;
 
 use std::{path::Path, sync::Arc};
 

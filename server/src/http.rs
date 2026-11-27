@@ -30,8 +30,8 @@ pub fn router(
             sync,
         ))
         .merge(crate::pages::router())
+        .merge(crate::tri::router())
         .route("/v1/folders", get(sync::folders))
-        .route("/v1/screener", get(sync::screener))
         .nest("/admin/v1", admin::router(db.clone(), config))
         .route("/v1/health", get(health))
         .fallback(async || api_error(StatusCode::NOT_FOUND, "not_found", "Route API inconnue."))
@@ -57,6 +57,8 @@ pub fn router(
         "/reception",
         "/flux",
         "/justificatifs",
+        "/nouveaux-expediteurs",
+        "/historique-du-tri",
         "/dossier/{id}",
         "/ecrire",
     ] {
