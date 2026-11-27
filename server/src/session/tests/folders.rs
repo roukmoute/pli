@@ -9,18 +9,18 @@ pub(super) fn login_dialog(result: &str) -> Dialogue {
     )]
 }
 
-fn ok(command: &str, responses: &str) -> (String, String) {
+pub(super) fn ok(command: &str, responses: &str) -> (String, String) {
     (command.into(), format!("{responses}{{tag}} OK terminé\r\n"))
 }
 
-fn status(name: &str, validity: u32, next: u32) -> (String, String) {
+pub(super) fn status(name: &str, validity: u32, next: u32) -> (String, String) {
     ok(
         &format!("STATUS \"{name}\" (UIDVALIDITY UIDNEXT)"),
         &format!("* STATUS \"{name}\" (UIDNEXT {next} UIDVALIDITY {validity})\r\n"),
     )
 }
 
-fn list_dialog(validity: u32, next: u32, special: bool, extra_names: &str) -> Dialogue {
+pub(super) fn list_dialog(validity: u32, next: u32, special: bool, extra_names: &str) -> Dialogue {
     let mut dialog = login_dialog("OK welcome");
     dialog.push(status("INBOX", validity, next));
     let mut list = r#"LIST "" "*""#.to_owned();
@@ -37,8 +37,22 @@ fn list_dialog(validity: u32, next: u32, special: bool, extra_names: &str) -> Di
     dialog
 }
 
+fn empty_history(dialog: &mut Dialogue, path: &str, validity: u32, next: u32) {
+    if next > 1 {
+        dialog.push(ok(
+            &format!("EXAMINE \"{path}\""),
+            &format!("* OK [UIDVALIDITY {validity}] stable\r\n"),
+        ));
+        dialog.push(ok(
+            &format!("UID SEARCH UID 1:{}", next - 1),
+            "* SEARCH\r\n",
+        ));
+    }
+}
+
 pub(super) fn inbox_dialog(validity: u32, next: u32) -> Dialogue {
     let mut dialog = list_dialog(validity, next, false, "");
+    empty_history(&mut dialog, "INBOX", validity, next);
     dialog.push(ok("LOGOUT", "* BYE fin\r\n"));
     dialog
 }
@@ -93,14 +107,22 @@ async fn discovers_special_use_and_resumes_from_the_encrypted_account_after_rest
     add_profile(&app, listener.local_addr()?.port(), true)?;
     let names = "* LIST (\\Trash) \"/\" Gesendet\r\n* LIST () NIL Sent\r\n* LIST (\\Noselect) \"/\" Classement\r\n";
     let mut first = list_dialog(42, 21, true, names);
-    first.extend([
-        status("Gesendet", 30, 2),
-        status("Sent", 11, 1),
-        ok("LOGOUT", ""),
-    ]);
+    first.extend([status("Gesendet", 30, 2), status("Sent", 11, 1)]);
+    empty_history(&mut first, "INBOX", 42, 21);
+    empty_history(&mut first, "Gesendet", 30, 2);
+    first.push(ok("LOGOUT", ""));
     let mut second = list_dialog(52, 101, false, "* LIST () \"/\" Envoy&AOk-s\r\n");
-    second.extend([status("Envoy&AOk-s", 27, 3), ok("LOGOUT", "")]);
-    let peer = imap_peer(listener, vec![first, second]);
+    second.push(status("Envoy&AOk-s", 27, 3));
+    empty_history(&mut second, "INBOX", 52, 101);
+    empty_history(&mut second, "Envoy&AOk-s", 27, 3);
+    second.push(ok("LOGOUT", ""));
+    let (imported, finished) = tokio::sync::oneshot::channel();
+    let peer = tokio::spawn(async move {
+        let (first_socket, _) = listener.accept().await.unwrap();
+        super::dialogue(first_socket, first).await;
+        let _ = imported.send(());
+        imap_peer(listener, vec![second]).await.unwrap();
+    });
     let router = routes(&app, true, config());
     assert_error(
         request(&router, Method::GET, FOLDERS, None, Value::Null).await,
@@ -126,6 +148,7 @@ async fn discovers_special_use_and_resumes_from_the_encrypted_account_after_rest
     app.db
         .writer()?
         .execute("UPDATE folders SET hidden=1 WHERE id=?1", [inbox_id])?;
+    finished.await?;
     drop(router);
 
     let app = app.reopen()?;
@@ -201,8 +224,7 @@ async fn writing_the_marker_and_the_folders_is_one_transaction() -> Result<(), E
         "CREATE TRIGGER reject_marker BEFORE INSERT ON inbox_markers
         BEGIN SELECT RAISE(ABORT, 'écriture refusée'); END;",
     )?;
-    let mut failed = inbox_dialog(77, 6);
-    failed.pop(); // L'échec SQLite ferme la connexion avant LOGOUT.
+    let failed = list_dialog(77, 6, false, "");
     let peer = imap_peer(listener, vec![failed, inbox_dialog(77, 7)]);
     let router = routes(&app, true, config());
     assert_error(

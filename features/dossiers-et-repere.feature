@@ -2,6 +2,7 @@ Feature: Découvrir les dossiers et enregistrer le repère de réception
 
   Background:
     Given le profil du banc est en service
+    And le nombre de messages est relevé à la création du repère
     And Alice ouvre sa session
 
   Scenario Outline: Retrouver les dossiers de la boîte malgré leurs libellés étrangers

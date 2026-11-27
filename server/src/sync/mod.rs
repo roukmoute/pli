@@ -1,4 +1,9 @@
 mod discovery;
+mod header;
+mod imap;
+mod import;
+mod messages;
+mod preview;
 mod store;
 
 use std::{
@@ -73,33 +78,55 @@ impl Context {
         admin::login_mailbox(&server.profile, &address, &password).await
     }
 
-    async fn discover(&self, account: i64, mut session: ImapSession) -> Result<(), Error> {
-        let discovery = discovery::discover(&mut session).await?;
+    async fn discover(
+        &self,
+        account: i64,
+        session: &mut ImapSession,
+    ) -> Result<Vec<messages::Mailbox>, Error> {
+        let discovery = discovery::discover(session).await?;
         let db = self.db.clone();
-        spawn_blocking(move || store::save(&mut *db.writer()?, account, &discovery)).await??;
-        let _ = timeout(Duration::from_secs(1), session.logout()).await;
-        Ok(())
+        spawn_blocking(move || {
+            let mut writer = db.writer()?;
+            store::save(&mut writer, account, &discovery)?;
+            Ok(messages::mailboxes(&writer, account)?)
+        })
+        .await?
+    }
+
+    async fn prepare(
+        self: &Arc<Self>,
+        account: i64,
+        request: Request,
+    ) -> Result<(ImapSession, Vec<messages::Mailbox>), LoginFailure> {
+        let (mut session, reply) = match request {
+            Request::Resume => (self.reconnect(account).await?, None),
+            Request::Login(session, reply) => (*session, Some(reply)),
+        };
+        let folders = self.discover(account, &mut session).await;
+        if let Some(reply) = reply {
+            let _ = reply.send(folders.is_ok());
+        }
+        Ok((session, folders.map_err(|_| LoginFailure::Unavailable)?))
     }
 
     async fn run(self: Arc<Self>, account: i64, mut requests: mpsc::Receiver<Request>) {
         let mut next = requests.recv().await;
         while let Some(request) = next {
-            let (session, reply) = match request {
-                Request::Resume => (self.reconnect(account).await, None),
-                Request::Login(session, reply) => (Ok(*session), Some(reply)),
-            };
-            let result = match session {
-                Ok(session) => self
-                    .discover(account, session)
-                    .await
-                    .map_err(|_| LoginFailure::Unavailable),
+            let result = match self.prepare(account, request).await {
+                Ok((session, folders)) => tokio::select! {
+                    result = import::run(&self, session, &folders) => result.map_err(|_| LoginFailure::Unavailable),
+                    request = requests.recv() => {
+                        next = request;
+                        continue;
+                    }
+                },
                 Err(failure) => Err(failure),
             };
-            if let Some(reply) = reply {
-                let _ = reply.send(result.is_ok());
-            }
             next = if matches!(result, Err(LoginFailure::Unavailable)) {
-                tracing::warn!(account_id = account, "Découverte des dossiers à reprendre");
+                tracing::warn!(
+                    account_id = account,
+                    "Synchronisation du compte à reprendre"
+                );
                 timeout(Duration::from_secs(30), requests.recv())
                     .await
                     .unwrap_or(Some(Request::Resume))
@@ -182,11 +209,30 @@ pub(crate) async fn folders(
     account: CompteAuthentifie,
     State(db): State<Arc<Database>>,
 ) -> Result<Json<Folders>, ApiError> {
-    let folders = spawn_blocking(move || -> Result<_, Error> {
-        Ok(store::folders(&*db.reader()?, account.account_id)?)
-    })
-    .await
-    .map_err(unavailable)?
-    .map_err(unavailable)?;
+    let folders = read(db, account, store::folders).await?;
     Ok(Json(Folders { folders }))
+}
+
+#[derive(Serialize)]
+pub(crate) struct Screener {
+    senders: Vec<messages::PendingSender>,
+}
+
+pub(crate) async fn screener(
+    account: CompteAuthentifie,
+    State(db): State<Arc<Database>>,
+) -> Result<Json<Screener>, ApiError> {
+    let senders = read(db, account, messages::pending).await?;
+    Ok(Json(Screener { senders }))
+}
+
+async fn read<T: Send + 'static>(
+    db: Arc<Database>,
+    account: CompteAuthentifie,
+    query: fn(&rusqlite::Connection, i64) -> rusqlite::Result<T>,
+) -> Result<T, ApiError> {
+    spawn_blocking(move || -> Result<_, Error> { Ok(query(&*db.reader()?, account.account_id)?) })
+        .await
+        .map_err(unavailable)?
+        .map_err(unavailable)
 }

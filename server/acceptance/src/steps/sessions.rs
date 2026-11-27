@@ -50,7 +50,7 @@ impl World {
         format!("http://{}/api/v1/session", self.address)
     }
 
-    async fn open_mailbox(&mut self, name: &str, secret: &str) -> Result<(), Problem> {
+    pub(super) async fn open_mailbox(&mut self, name: &str, secret: &str) -> Result<(), Problem> {
         let address = format!("{name}@recette.test");
         self.send(
             self.client

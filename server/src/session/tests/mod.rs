@@ -1,4 +1,5 @@
 mod folders;
+mod headers;
 
 use axum::{
     body::{Body, to_bytes},
@@ -108,38 +109,40 @@ type Dialogue = Vec<(String, String)>;
 
 fn imap_peer(listener: TcpListener, dialogs: Vec<Dialogue>) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        let acceptor = tls_acceptor();
         for dialog in dialogs {
             let socket = listener.accept().await.unwrap().0;
-            let mut io = BufReader::new(acceptor.accept(socket).await.unwrap());
-            io.write_all(b"* OK recette\r\n").await.unwrap();
-            for (command, reply) in dialog {
-                let mut line = String::new();
-                io.read_line(&mut line).await.unwrap();
-                let (tag, actual) = line.trim_end().split_once(' ').unwrap();
-                assert_eq!(actual, command);
-                let reply = if let Some(tagged) = reply.strip_prefix("* BYE fin\r\n") {
-                    io.write_all(b"* BYE fin\r\n").await.unwrap();
-                    io.flush().await.unwrap();
-                    // Le client doit attendre le OK étiqueté après le BYE (RFC 9051 §3.4).
-                    let closed =
-                        tokio::time::timeout(std::time::Duration::from_millis(25), io.fill_buf())
-                            .await;
-                    assert!(
-                        closed.is_err(),
-                        "Connexion fermée avant la réponse à LOGOUT"
-                    );
-                    tagged
-                } else {
-                    &reply
-                };
-                io.write_all(reply.replace("{tag}", tag).as_bytes())
-                    .await
-                    .unwrap();
-                io.flush().await.unwrap();
-            }
+            dialogue(socket, dialog).await;
         }
     })
+}
+
+async fn dialogue(socket: tokio::net::TcpStream, dialog: Dialogue) {
+    let mut io = BufReader::new(tls_acceptor().accept(socket).await.unwrap());
+    io.write_all(b"* OK recette\r\n").await.unwrap();
+    for (command, reply) in dialog {
+        let mut line = String::new();
+        io.read_line(&mut line).await.unwrap();
+        let (tag, actual) = line.trim_end().split_once(' ').unwrap();
+        assert_eq!(actual, command);
+        let reply = if let Some(tagged) = reply.strip_prefix("* BYE fin\r\n") {
+            io.write_all(b"* BYE fin\r\n").await.unwrap();
+            io.flush().await.unwrap();
+            // Le client doit attendre le OK étiqueté après le BYE (RFC 9051 §3.4).
+            let closed =
+                tokio::time::timeout(std::time::Duration::from_millis(25), io.fill_buf()).await;
+            assert!(
+                closed.is_err(),
+                "Connexion fermée avant la réponse à LOGOUT"
+            );
+            tagged
+        } else {
+            &reply
+        };
+        io.write_all(reply.replace("{tag}", tag).as_bytes())
+            .await
+            .unwrap();
+        io.flush().await.unwrap();
+    }
 }
 
 fn assert_encrypted_secret(db: &rusqlite::Connection) -> Result<(), Error> {

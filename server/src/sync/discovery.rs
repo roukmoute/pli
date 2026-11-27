@@ -1,14 +1,14 @@
-use std::{num::NonZeroU32, time::Duration};
+use std::num::NonZeroU32;
 
 use async_imap::{
-    imap_proto::{MailboxDatum, MailboxListData, Response, Status},
+    imap_proto::{MailboxDatum, MailboxListData, Response},
     types::{Capability, NameAttribute},
 };
 use tokio::time::timeout;
 
 use crate::{Error, admin::ImapSession};
 
-const COMMAND_TIMEOUT: Duration = Duration::from_secs(15);
+use super::imap::{COMMAND_TIMEOUT, command};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct Uids {
@@ -71,7 +71,7 @@ fn role_by_name(path: &str, delimiter: Option<&str>) -> Option<&'static str> {
     }
 }
 
-async fn status(session: &mut ImapSession, name: &str) -> Result<Uids, Error> {
+pub(super) async fn status(session: &mut ImapSession, name: &str) -> Result<Uids, Error> {
     let status = timeout(
         COMMAND_TIMEOUT,
         session.status(name, "(UIDVALIDITY UIDNEXT)"),
@@ -93,32 +93,20 @@ async fn list(
     session: &mut ImapSession,
     special_use: bool,
 ) -> Result<Vec<MailboxListData<'static>>, Error> {
-    let command = if special_use {
+    let list = if special_use {
         r#"LIST "" "*" RETURN (SPECIAL-USE)"#
     } else {
         r#"LIST "" "*""#
     };
-    // Le flux de Session::list ne distingue pas la fin OK d'une liste partielle suivie de NO.
-    let tag = session.run_command(command).await?;
     let mut listed = Vec::new();
-    while let Some(reply) = session.read_response().await? {
-        match reply.parsed() {
-            Response::MailboxData(MailboxDatum::List(name)) => {
-                listed.push(name.clone().into_owned())
-            }
-            Response::Done {
-                tag: end, status, ..
-            } if *end == tag => {
-                return if *status == Status::Ok {
-                    Ok(listed)
-                } else {
-                    Err("LIST refusé.".into())
-                };
-            }
-            _ => {}
+    command(session, list, |response| {
+        if let Response::MailboxData(MailboxDatum::List(name)) = response {
+            listed.push(name.clone().into_owned());
         }
-    }
-    Err("Liste des dossiers IMAP interrompue.".into())
+        Ok(())
+    })
+    .await?;
+    Ok(listed)
 }
 
 pub(super) async fn discover(session: &mut ImapSession) -> Result<Discovery, Error> {
@@ -128,7 +116,7 @@ pub(super) async fn discover(session: &mut ImapSession) -> Result<Discovery, Err
     let special_use = capabilities
         .iter()
         .any(|c| matches!(c, Capability::Atom(name) if name.eq_ignore_ascii_case("SPECIAL-USE")));
-    let names = timeout(COMMAND_TIMEOUT, list(session, special_use)).await??;
+    let names = list(session, special_use).await?;
     let mut folders = Vec::with_capacity(names.len());
     for name in names {
         let (role, uids) = if name.name_attributes.contains(&NameAttribute::NoSelect) {

@@ -89,13 +89,17 @@ Lorsque le serveur annonce `SPECIAL-USE`, ses attributs déterminent les rôles 
 
 `GET /api/v1/folders` renvoie les dossiers du compte identifié par le cookie, dans le tableau `folders`. Chaque entrée contient `id`, `path`, `delimiter`, `hidden` et `role`. Les rôles possibles sont `inbox`, `sent`, `drafts`, `junk`, `trash` et `archive`. Un dossier personnel a le rôle `null`.
 
+Le synchroniseur importe jusqu’à 50 en-têtes par lot, en commençant par les UID les plus récents. Pendant l’import, une seconde connexion vérifie INBOX toutes les cinq secondes. Le serveur conserve un extrait de la partie textuelle et lit les dossiers en lecture seule.
+
+`GET /api/v1/screener` renvoie le tableau `senders` pour la session ouverte. Chaque entrée regroupe les nouvelles lettres d’une adresse en attente et contient `address`, `name`, `last_subject`, `snippet`, `message_count` et `revision`. Les lettres d’INBOX antérieures au repère restent en Réception, même si la même adresse écrit à nouveau et attend une décision.
+
 Le cookie est propre à l’hôte, `Secure`, `HttpOnly` et `SameSite=Strict`. Servez Pli en HTTPS en déploiement et utilisez l’adresse de bouclage en développement. SQLite conserve l’empreinte SHA-256 du jeton et le secret IMAP chiffré en AES-256-GCM. Le chiffrement associe le secret à l’adresse et au profil serveur. Sauvegardez la clé séparément de la base pour pouvoir relire les secrets après restauration.
 
 **Isolation des boîtes.** Chaque route de données de courrier reçoit l’extracteur Axum `CompteAuthentifie`. Ses lectures et écritures filtrent sur `account_id` issu de cette session, y compris lors d’un accès par identifiant de ressource. L’API de santé est publique. L’administration utilise son propre jeton.
 
 ## Structure
 
-- `server/` produit le binaire unique `webmail-server`, point d’entrée de l’API et du futur synchroniseur. SQLite fonctionne en WAL avec une connexion d’écriture et quatre connexions réservées aux lectures. Chaque connexion active les clés étrangères.
+- `server/` produit le binaire unique `webmail-server`, point d’entrée de l’API et du synchroniseur. SQLite fonctionne en WAL avec une connexion d’écriture et quatre connexions réservées aux lectures. Chaque connexion active les clés étrangères.
 - `server/migrations/` contient les migrations SQL numérotées. Ajoutez le prochain dossier, par exemple `002-nom/up.sql`, puis recompilez. Au démarrage, le binaire applique les migrations embarquées dans l’ordre et enregistre la version dans `PRAGMA user_version`. Un schéma plus récent que le binaire interrompt le démarrage.
 - `server/src/http.rs` expose l’API sous `/api/v1`. Les erreurs JSON contiennent `code` et `message`. Toutes les réponses d’API portent `Cache-Control: no-store`. Axum sert aussi `web/dist/`. Le navigateur revalide `index.html` à chaque visite et peut conserver un an les fichiers à empreinte de `/assets/`.
 - `web/src/` contient l’interface SolidJS et ses CSS Modules. **Aucun composant n’appelle directement `fetch`, IndexedDB ou EventSource.** Les composants passent par les actions métier exportées de `web/src/sync/index.ts`. Le client HTTP typé se trouve dans `web/src/sync/api.ts`.

@@ -27,7 +27,14 @@ export PATH="$(cd "$cible/debug" && pwd):$PATH"
 unset PLI_ACCEPTANCE_IR
 export WEBMAIL_SECRET_KEY
 WEBMAIL_SECRET_KEY=$(openssl rand -hex 32)
-export WEBMAIL_SESSION_TTL_SECONDS=3
+# Seul le scénario d’expiration requiert un cookie très bref.
+duree_session() {
+    if [[ $1 == session-courrier ]]; then
+        echo 3
+    else
+        echo 120
+    fi
+}
 mkdir -p build/acceptance/{ir,dry}
 
 # Un seul jeu de base pour la suite et ses mutations. Les ports publiés
@@ -50,7 +57,7 @@ for feature in "${features[@]}"; do
     aps gherkin-parser "$feature" "$ir"
     aps gherkin-ir-dry-checker "$ir" "build/acceptance/dry/$nom.json"
     acceptance-entrypoint-generator "$ir" "$suite"
-    "$suite/run"
+    WEBMAIL_SESSION_TTL_SECONDS=$(duree_session "$nom") "$suite/run"
 done
 
 if [[ ${1-} == mutation ]]; then
@@ -61,7 +68,7 @@ if [[ ${1-} == mutation ]]; then
         mkdir -p "$travail/features"
         cp "$feature" "$travail/$feature"
         echo "Rapport de mutation : $travail/rapport.json"
-        (cd "$travail" && aps gherkin-mutator --feature "$feature" --level full \
+        (cd "$travail" && WEBMAIL_SESSION_TTL_SECONDS=$(duree_session "$nom") aps gherkin-mutator --feature "$feature" --level full \
             --generated-dir "$racine/acceptance/generated/$nom" --work-dir . \
             --runner-worker "acceptance-runner --worker" --json) > "$travail/rapport.json"
     done

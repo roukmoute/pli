@@ -7,6 +7,7 @@ use crate::{Error, Example};
 mod folders;
 mod privacy;
 mod profiles;
+mod screener;
 mod sessions;
 
 const TOKEN: &str = "jeton-fictif-acceptation";
@@ -34,6 +35,7 @@ pub(crate) struct World {
     session: sessions::SessionSteps,
     pub(crate) restart: Option<tokio::sync::mpsc::Sender<crate::runtime::Restart>>,
     initial_marker: Option<(u32, u32)>,
+    screener_bench: Option<screener::Bench>,
     pub(crate) recordings: Option<(PathBuf, PathBuf)>,
 }
 
@@ -51,6 +53,7 @@ impl World {
             session: Default::default(),
             restart: None,
             initial_marker: None,
+            screener_bench: None,
             recordings: None,
         })
     }
@@ -94,6 +97,7 @@ impl World {
         } else if !self.privacy_step(text, example)?
             && !self.session_step(text, example).await?
             && !self.folder_step(text, example).await?
+            && !self.screener_step(text, example).await?
         {
             self.profile_step(text, example).await?;
         }

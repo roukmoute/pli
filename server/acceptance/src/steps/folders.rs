@@ -4,7 +4,7 @@ use serde_json::Value;
 use super::{Example, Problem, World, example_value, expect, parameter};
 
 impl World {
-    fn database(&self) -> Result<Connection, Problem> {
+    pub(super) fn database(&self) -> Result<Connection, Problem> {
         let (directory, _) = self
             .recordings
             .as_ref()
@@ -23,21 +23,21 @@ impl World {
         ).map_err(|_| Problem::Step("Repère de réception d’Alice absent.".into()))
     }
 
-    fn imported_messages(&self) -> Result<u32, Problem> {
-        let db = self.database()?;
-        if !db.table_exists(None, "messages").map_err(Problem::infra)? {
-            return Ok(0);
-        }
-        db.query_row(
-            "SELECT count(*) FROM messages m JOIN accounts a ON a.id=m.account_id
-                      WHERE a.address='alice@recette.test'",
-            [],
-            |r| r.get(0),
-        )
-        .map_err(Problem::infra)
+    fn observe_first_marker(&self) -> Result<(), Problem> {
+        let (dir, _) = self
+            .recordings
+            .as_ref()
+            .ok_or_else(|| Problem::infra("Base de recette absente."))?;
+        Connection::open(dir.join("webmail.db")).map_err(Problem::infra)?.execute_batch(
+            "CREATE TABLE messages_au_rattachement(account_id INTEGER PRIMARY KEY, total INTEGER);
+             CREATE TRIGGER relever_import AFTER INSERT ON inbox_markers BEGIN
+               INSERT INTO messages_au_rattachement SELECT NEW.account_id, count(*) FROM messages
+                 WHERE account_id=NEW.account_id;
+             END;"
+        ).map_err(Problem::infra)
     }
 
-    async fn restart_service(&mut self) -> Result<(), Problem> {
+    pub(super) async fn restart_service(&mut self) -> Result<(), Problem> {
         let (reply, address) = tokio::sync::oneshot::channel();
         self.restart
             .as_ref()
@@ -51,6 +51,10 @@ impl World {
 
     pub(super) async fn folder_step(&mut self, text: &str, row: &Example) -> Result<bool, Problem> {
         let query = match text {
+            "le nombre de messages est relevé à la création du repère" => {
+                self.observe_first_marker()?;
+                return Ok(true);
+            }
             "je consulte les dossiers de ma boîte" => String::new(),
             "Bob consulte les dossiers en indiquant le compte d’Alice" => {
                 format!("?account_id={}", self.session.alice_id()?)
@@ -78,7 +82,9 @@ impl World {
                 self.initial_marker = Some(marker);
                 marker.1.to_string()
             }
-            "le nombre de messages déjà importés est " => self.imported_messages()?.to_string(),
+            "le nombre de messages déjà importés est " => self.database()?.query_row(
+                "SELECT total FROM messages_au_rattachement m JOIN accounts a ON a.id=m.account_id
+                 WHERE a.address='alice@recette.test'", [], |r| r.get::<_, u32>(0)).map_err(Problem::infra)?.to_string(),
             "le repère de réception depuis le rattachement est " => {
                 let first = self
                     .initial_marker
@@ -136,11 +142,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db = Connection::open(dir.path().join("webmail.db")).unwrap();
         db.execute_batch("CREATE TABLE accounts(id, address); INSERT INTO accounts VALUES(3,'alice@recette.test');
-            CREATE TABLE inbox_markers(account_id,uidvalidity,uidnext); INSERT INTO inbox_markers VALUES(3,19,25);").unwrap();
+            CREATE TABLE inbox_markers(account_id,uidvalidity,uidnext); CREATE TABLE messages(account_id);").unwrap();
         let body = json!({"folders":[{"path":"P", "role":"trash"},{"path":"A", "role":null},{"path":"E", "role":"sent"}]});
         let mut world = World::new("127.0.0.1:1".parse().unwrap()).unwrap();
         world.recordings = Some((dir.path().into(), dir.path().join("log")));
         world.response = Some((StatusCode::OK, body.to_string()));
+        assert!(
+            world
+                .folder_step(
+                    "le nombre de messages est relevé à la création du repère",
+                    &Example::new()
+                )
+                .await
+                .unwrap()
+        );
+        db.execute_batch(
+            "INSERT INTO inbox_markers VALUES(3,19,25); INSERT INTO messages VALUES(3),(4);",
+        )
+        .unwrap();
         for (prefix, expected) in [
             ("le dossier des envoyés est ", "E"),
             ("le dossier de la corbeille est ", "P"),
@@ -159,12 +178,8 @@ mod tests {
                 assert_eq!(matches!(result, Ok(true)), passes, "{prefix}{value}");
             }
         }
-        db.execute_batch(
-            "CREATE TABLE messages(account_id); INSERT INTO messages VALUES(3),(4);
-            UPDATE inbox_markers SET uidvalidity=20;",
-        )
-        .unwrap();
-        assert_eq!(world.imported_messages().unwrap(), 1);
+        db.execute_batch("UPDATE inbox_markers SET uidvalidity=20;")
+            .unwrap();
         let expected = Example::from([("repere".into(), "identique".into())]);
         assert!(
             world
