@@ -20,7 +20,22 @@ impl World {
                     .await?;
             return Ok(true);
         }
+        if texte
+            == "je reviens du premier fil, sélectionne les deux autres et change leur état dans le navigateur"
+        {
+            let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/selection.mjs");
+            self.lecture = observer(&mut commande_navigation(script, self.address)).await?;
+            return Ok(true);
+        }
         for (prefixe, suffixe, mesure) in [
+            ("la sélection partielle annonce ", " fils", "selection"),
+            ("le lot marque ", " messages lus dans la boîte", "marques"),
+            (
+                "les autres cibles de la ligne ouvrent ",
+                " messages",
+                "ouvertures",
+            ),
+            ("la boîte étrangère refuse ", " identifiant", "refus"),
             ("le préchargement marque ", " messages lus", "prechargement"),
             ("l’ouverture marque ", " messages lus", "ouverture"),
             (
@@ -62,6 +77,13 @@ mod tests {
     async fn exige_la_mesure_de_chaque_geste() {
         let mut world = World::new("127.0.0.1:1".parse().unwrap()).unwrap();
         for (etape, champ) in [
+            ("la sélection partielle annonce <n> fils", "selection"),
+            ("le lot marque <n> messages lus dans la boîte", "marques"),
+            (
+                "les autres cibles de la ligne ouvrent <n> messages",
+                "ouvertures",
+            ),
+            ("la boîte étrangère refuse <n> identifiant", "refus"),
             ("le préchargement marque <n> messages lus", "prechargement"),
             ("l’ouverture marque <n> messages lus", "ouverture"),
             (
