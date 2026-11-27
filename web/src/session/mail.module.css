@@ -4,16 +4,16 @@
   display: grid;
   place-items: center;
   padding: clamp(1rem, 4vw, 2.5rem);
-  background: #f4f3f9;
+  background: var(--fond);
 }
 
 .card {
   width: min(100%, 27rem);
   box-sizing: border-box;
   padding: clamp(1.4rem, 6vw, 2.5rem);
-  border: 1px solid #dedce8;
-  border-radius: 1.25rem;
-  background: #fff;
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon-surface);
+  background: var(--surface);
   box-shadow: 0 0.75rem 3rem #34305b0b;
 }
 
@@ -29,7 +29,7 @@
 }
 
 .brand {
-  color: #443898;
+  color: var(--commande);
   font-size: 2.3rem;
   font-weight: 750;
   line-height: 1;
@@ -41,7 +41,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.45rem;
-  color: #544f66;
+  color: var(--texte-secondaire);
   font-size: 0.875rem;
 }
 
@@ -51,8 +51,8 @@
   max-width: 100%;
   min-height: 2.75rem;
   padding: 0.45rem 0.7rem;
-  color: #26243b;
-  border: 1px solid #8d899e;
+  color: var(--texte);
+  border: 1px solid var(--bord-controle);
   border-radius: 0.45rem;
   background: white;
   font: inherit;
@@ -85,34 +85,15 @@
   font-weight: 400;
 }
 
-.card button {
-  min-height: 2.8rem;
-  padding: 0.6rem 1.1rem;
-  color: #fff;
-  border: 0;
-  border-radius: 0.5rem;
-  background: #483b97;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.card button:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-
-.card :focus-visible {
-  outline: 3px solid #126d73;
-  outline-offset: 3px;
-}
-
 .card [role="alert"] {
   margin: 0.5rem 0;
-  color: #932f38;
+  color: var(--erreur);
 }
 
 .address {
-  color: #59556c;
+  display: flex;
+  gap: var(--espace-3);
+  align-items: center;
+  color: var(--texte-secondaire);
   overflow-wrap: anywhere;
 }

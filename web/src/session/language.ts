@@ -1,21 +1,7 @@
+import { connexionFr } from "../i18n/fr";
+
 export const labels = {
-  fr: {
-    language: "Langue",
-    title: "Connexion",
-    address: "Adresse de messagerie",
-    password: "Secret de messagerie",
-    open: "Se connecter",
-    close: "Se déconnecter",
-    inbox: "Réception",
-    retry: "Réessayer",
-    loading: "Ouverture de Pli…",
-    invalid: "Adresse ou secret de messagerie incorrect.",
-    offline:
-      "Le service de messagerie est indisponible. Réessayez dans un instant.",
-    expired: "Votre session a expiré. Reconnectez-vous.",
-    senders:
-      "Vous retrouverez les demandes de tri dans « Nouveaux expéditeurs ».",
-  },
+  fr: connexionFr,
   en: {
     language: "Language",
     title: "Sign in",

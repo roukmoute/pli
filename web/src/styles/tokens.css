@@ -1,0 +1,52 @@
+:root {
+  --fond: #f5f4fa;
+  --surface: #fff;
+  --texte: #242237;
+  --texte-secondaire: #565267;
+  --commande: #46368c;
+  --commande-survol: #35266f;
+  --sur-commande: #fff;
+  --tri: #00696a;
+  --fond-tri: #d8f3ef;
+  --bord: #dddbe6;
+  --bord-controle: #797486;
+  --erreur: #992f40;
+  --focus: #005e79;
+  --police: Inter, system-ui, sans-serif;
+  --interligne: 1.5;
+  --espace-1: 0.25rem;
+  --espace-2: 0.5rem;
+  --espace-3: 0.75rem;
+  --espace-4: 1rem;
+  --espace-6: 1.5rem;
+  --espace-8: 2rem;
+  --rayon-controle: 0.5rem;
+  --rayon-surface: 1.25rem;
+  --largeur-lecture: 68ch;
+  --hauteur-ligne: 4rem;
+  --cible-tactile: 2.75rem;
+  --graisse-nouveau: 720;
+  --contour-selection: 2px solid var(--commande);
+  --anneau-focus: 3px solid var(--focus);
+  --decalage-focus: 3px;
+}
+
+[data-densite="compacte"] {
+  --hauteur-ligne: 3rem;
+}
+
+[data-lecture="large"] {
+  --largeur-lecture: 82ch;
+}
+
+:focus-visible {
+  outline: var(--anneau-focus);
+  outline-offset: var(--decalage-focus);
+}
+
+@media (forced-colors: active) {
+  :root {
+    --focus: Highlight;
+    --contour-selection: 2px solid Highlight;
+  }
+}

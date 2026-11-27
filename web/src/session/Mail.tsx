@@ -1,4 +1,6 @@
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
+import { Avatar } from "../components/Avatar";
+import { Bouton } from "../components/Bouton";
 import {
   ApiError,
   fermerSession,
@@ -131,14 +133,19 @@ export default function Mail() {
             {(session) => (
               <>
                 <h1>{text().inbox}</h1>
-                <p class={styles.address}>{session.address}</p>
+                <p class={styles.address}>
+                  <span aria-hidden="true">
+                    <Avatar nom={session.address} />
+                  </span>
+                  {session.address}
+                </p>
                 <p>{text().senders}</p>
-                <button
+                <Bouton
                   type="button"
                   onClick={(e) => void close(e.currentTarget)}
                 >
                   {text().close}
-                </button>
+                </Bouton>
                 <Show when={closeFailed()}>
                   <p role="alert">{text().offline}</p>
                 </Show>
@@ -147,9 +154,9 @@ export default function Mail() {
           </Match>
           <Match when={page().kind === "offline"}>
             <p role="alert">{text().offline}</p>
-            <button type="button" onClick={() => void restore()}>
+            <Bouton type="button" onClick={() => void restore()}>
               {text().retry}
-            </button>
+            </Bouton>
           </Match>
         </Switch>
       </section>

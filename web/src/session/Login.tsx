@@ -1,4 +1,5 @@
 import { createSignal, Show } from "solid-js";
+import { Bouton } from "../components/Bouton";
 import { ApiError, ouvrirSession, type Session } from "../sync";
 import type { Labels } from "./language";
 import styles from "./mail.module.css";
@@ -69,9 +70,14 @@ export default function Login(props: {
       <Show when={error()} keyed>
         {(reason) => <p role="alert">{props.text[reason]}</p>}
       </Show>
-      <button ref={button} type="submit">
+      <Bouton
+        ref={(element) => {
+          button = element;
+        }}
+        type="submit"
+      >
         {props.text.open}
-      </button>
+      </Bouton>
     </form>
   );
 }

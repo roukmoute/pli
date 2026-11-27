@@ -1,0 +1,56 @@
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espace-2);
+  min-height: var(--cible-tactile);
+  min-width: var(--cible-tactile);
+  padding: var(--espace-2) var(--espace-4);
+  border: 1px solid transparent;
+  border-radius: var(--rayon-controle);
+  color: var(--sur-commande);
+  background: var(--commande);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.bouton:hover:enabled {
+  background: var(--commande-survol);
+}
+
+.bouton[data-icone] {
+  padding: var(--espace-2);
+  background: var(--surface);
+  color: var(--commande);
+  border-color: var(--bord-controle);
+}
+
+.bouton[data-icone]:hover:enabled {
+  background: var(--fond);
+}
+
+.bouton:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.avatar {
+  display: inline-grid;
+  place-content: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  flex: none;
+  overflow: hidden;
+  border-radius: 50%;
+  color: var(--tri);
+  background: var(--fond-tri);
+  font-weight: 650;
+  line-height: 1;
+}
+
+.avatar img {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  object-fit: cover;
+}
