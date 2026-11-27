@@ -1,5 +1,6 @@
 .DEFAULT_GOAL := check
 .PHONY: dev lint build test check
+.PHONY: bench-up bench-down bench-seed test-integration
 
 dev lint build: web/node_modules/.installed .env.example
 
@@ -20,6 +21,20 @@ test: web/node_modules/.installed
 	npm --prefix web test
 
 check: lint build test
+
+bench-up:
+	docker compose -f bench/docker-compose.yml up --wait --wait-timeout 90
+
+bench-down:
+	docker compose -f bench/docker-compose.yml down
+
+bench-seed: export DATASET ?= base
+bench-seed: export SEED ?= 42
+bench-seed:
+	python3 bench/seed.py "$$DATASET" --seed "$$SEED"
+
+test-integration:
+	bash bench/test-integration.sh
 
 web/node_modules/.installed: web/package.json web/package-lock.json
 	npm --prefix web ci

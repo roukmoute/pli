@@ -1,0 +1,20 @@
+name: pli-bench
+services:
+  greenmail:
+    image: greenmail/standalone:2.1.15
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.imap -Dgreenmail.setup.test.imaps
+        -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.smtps
+        -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users.login=email
+        -Dgreenmail.users=alice:alice-test@recette.test,bob:bob-test@recette.test,carol:carol-test@recette.test
+    ports:
+      - "127.0.0.1:${PLI_BENCH_IMAP_PORT:-3143}:3143"
+      - "127.0.0.1:${PLI_BENCH_IMAPS_PORT:-3993}:3993"
+      - "127.0.0.1:${PLI_BENCH_SMTP_PORT:-3025}:3025"
+      - "127.0.0.1:${PLI_BENCH_SMTPS_PORT:-3465}:3465"
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "exec 3<>/dev/tcp/127.0.0.1/3143; read -r greeting <&3; [[ $$greeting == '* OK '* ]]"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

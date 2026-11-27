@@ -17,8 +17,9 @@ Ouvrez <http://127.0.0.1:5173>. L’accueil vérifie la disponibilité du serveu
 | `make build` | Construit `web/dist/`, puis le binaire `server/target/release/webmail-server`. |
 | `make test` | Exécute les tests Rust et les tests du front une fois. |
 | `make check` | Lance le lint, compile le projet et exécute les deux suites de tests. |
+| `make test-integration` | Peuple un GreenMail temporaire, exécute les tests d’intégration de messagerie puis arrête le banc. |
 
-Ces commandes installent les dépendances front avec `npm ci` au premier lancement et lorsque le manifeste ou son verrou change. Après `make build`, lancez le binaire depuis la racine. L’API et l’accueil sont alors accessibles sur le même port.
+Les commandes qui utilisent le front installent ses dépendances avec `npm ci` au premier lancement et lorsque le manifeste ou son verrou change. Après `make build`, lancez le binaire depuis la racine. L’API et l’accueil sont alors accessibles sur le même port.
 
 ```sh
 ./server/target/release/webmail-server
@@ -30,7 +31,7 @@ Dans un second terminal, `curl -s http://127.0.0.1:8080/api/v1/health` renvoie `
 
 À chaque push et à chaque pull request, le job `check` lance `make lint`, `make build` puis `make test` sur Ubuntu avec les versions de Rust et de Node du dépôt. Il fonctionne sans secret de messagerie.
 
-Les cartes consacrées aux tests d’intégration avec Docker et aux tests de bout en bout ajouteront leurs jobs au [même workflow CI](.github/workflows/ci.yml).
+Le job `integration` du même workflow vérifie le jeu de 20 messages avec Docker. Pour démarrer le banc à la main, choisir un jeu ou consulter les capacités IMAP mesurées, suivez le [guide du banc GreenMail](bench/README.md).
 
 ## Écrire et lancer un test
 
