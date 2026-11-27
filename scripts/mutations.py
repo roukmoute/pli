@@ -17,6 +17,7 @@ def commande_integration(chemin):
     if chemin.as_posix() in {
         "server/acceptance/src/steps/decisions.rs",
         "server/acceptance/src/steps/folders.rs",
+        "server/acceptance/src/steps/lecture.rs",
         "server/acceptance/src/steps/navigation.rs",
         "server/acceptance/src/steps/pages.rs",
         "server/acceptance/src/steps/screener.rs",

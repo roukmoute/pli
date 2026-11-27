@@ -1,6 +1,7 @@
 # Compilation, dépendances et tests
 target/
 node_modules/
+__pycache__/
 dist/
 web/dist/
 coverage/

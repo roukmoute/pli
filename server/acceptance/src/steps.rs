@@ -6,6 +6,7 @@ use serde_json::Value;
 use crate::{Error, Example};
 mod decisions;
 mod folders;
+mod lecture;
 mod navigation;
 mod pages;
 mod privacy;
@@ -41,6 +42,7 @@ pub(crate) struct World {
     page_precedente: Vec<String>,
     navigation: Option<navigation::Navigation>,
     decisions: Option<decisions::Observations>,
+    lecture: std::collections::BTreeMap<String, u32>,
     screener_bench: Option<screener::Bench>,
     pub(crate) recordings: Option<(PathBuf, PathBuf)>,
 }
@@ -62,6 +64,7 @@ impl World {
             page_precedente: Vec::new(),
             navigation: None,
             decisions: None,
+            lecture: Default::default(),
             screener_bench: None,
             recordings: None,
         })
@@ -105,15 +108,20 @@ impl World {
             expect(state, example_value(example, key)?)?;
         } else if !self.privacy_step(text, example)?
             && !self.session_step(text, example).await?
-            && !self.folder_step(text, example).await?
-            && !self.screener_step(text, example).await?
-            && !self.page_step(text, example).await?
-            && !self.navigation_step(text, example).await?
-            && !self.decisions_step(text, example).await?
+            && !self.courrier_step(text, example).await?
         {
             self.profile_step(text, example).await?;
         }
         Ok(())
+    }
+
+    async fn courrier_step(&mut self, text: &str, example: &Example) -> Result<bool, Problem> {
+        Ok(self.folder_step(text, example).await?
+            || self.screener_step(text, example).await?
+            || self.page_step(text, example).await?
+            || self.navigation_step(text, example).await?
+            || self.decisions_step(text, example).await?
+            || self.lecture_step(text, example).await?)
     }
 }
 
