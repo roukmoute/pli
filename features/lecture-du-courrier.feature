@@ -7,7 +7,8 @@ Feature: Lire une conversation et retrouver sa place
     And l’ouverture marque <ouverts> messages lus
     And les images distantes contactées avant mon choix sont au nombre de <images>
     And le corps demandé depuis une autre boîte répond avec le code <code>
+    And le nombre de requêtes lancées avant de retrouver la liste est <requetes>
 
     Examples:
-      | precharges | ouverts | images | code |
-      | 0          | 1       | 0      | 404  |
+      | precharges | ouverts | images | code | requetes |
+      | 0          | 1       | 0      | 404  | 0        |

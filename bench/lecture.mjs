@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { connecter, ouvrirNavigateur, tailles } from "./navigateur.mjs";
+import { observerRequetes, retour as observerRetour } from "./observer-retour.mjs";
 
 const base = process.argv[2];
 function sonde(fichier, args = []) {
@@ -37,6 +38,7 @@ async function api(page, chemin) {
 try {
   const page = await browser.newPage();
   page.setDefaultTimeout(6500);
+  await observerRequetes(page);
   await connecter(page, base, adresse, adresse);
   const jardin = page.getByRole("button", { name: /Le jardin en images/ });
   const cle = await jardin.getAttribute("data-fil");
@@ -90,7 +92,7 @@ try {
     await bloque.promise;
     await route.continue();
   });
-  await retour.click();
+  const mesureRetour = await observerRetour(retour);
   const ligne = page
     .locator("[data-section=deja_vus]")
     .getByRole("button", { name: /Le jardin en images/ });
@@ -140,6 +142,7 @@ try {
       prechargement: deltaPrechargement,
       ouverture,
       distantes: avantClic,
+      requetes_avant_rendu: mesureRetour.requetes_avant_rendu,
       autre,
     }),
   );

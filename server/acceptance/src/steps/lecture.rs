@@ -24,6 +24,11 @@ impl World {
             ("le préchargement marque ", " messages lus", "prechargement"),
             ("l’ouverture marque ", " messages lus", "ouverture"),
             (
+                "le nombre de requêtes lancées avant de retrouver la liste est ",
+                "",
+                "requetes_avant_rendu",
+            ),
+            (
                 "les images distantes contactées avant mon choix sont au nombre de ",
                 "",
                 "distantes",
@@ -59,6 +64,10 @@ mod tests {
         for (etape, champ) in [
             ("le préchargement marque <n> messages lus", "prechargement"),
             ("l’ouverture marque <n> messages lus", "ouverture"),
+            (
+                "le nombre de requêtes lancées avant de retrouver la liste est <n>",
+                "requetes_avant_rendu",
+            ),
             (
                 "les images distantes contactées avant mon choix sont au nombre de <n>",
                 "distantes",

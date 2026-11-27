@@ -1,5 +1,13 @@
 import { useNavigate } from "@solidjs/router";
-import { createEffect, For, Match, onSettled, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  For,
+  Match,
+  onSettled,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import { Avatar } from "../components/Avatar";
 import { t } from "../i18n";
 import { Icone } from "../icons/Icone";
@@ -107,9 +115,22 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
   onSettled(() => {
     restaurerPosition(zone, entree.repere);
     window.addEventListener("resize", memoriserDefilement);
-    void props.courrier.chargerVue(props.vue);
+    let prochaineFrame: number | undefined;
+    function actualiser() {
+      prochaineFrame = undefined;
+      void props.courrier.chargerVue(props.vue);
+    }
+    if (untrack(page)) {
+      // Laisser le navigateur peindre la liste en cache avant de lancer la requête.
+      prochaineFrame = requestAnimationFrame(() => {
+        prochaineFrame = requestAnimationFrame(actualiser);
+      });
+    } else {
+      actualiser();
+    }
     return () => {
       window.removeEventListener("resize", memoriserDefilement);
+      if (prochaineFrame !== undefined) cancelAnimationFrame(prochaineFrame);
       if (image !== undefined) cancelAnimationFrame(image);
     };
   });

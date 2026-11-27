@@ -121,6 +121,48 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
+it.each(["afficher", "quitter avant la peinture", "quitter après la peinture"])(
+  "respecte le premier affichage de la liste en cache pour %s",
+  async (action) => {
+    const { view, lireReception } = ouvrir();
+    await view.findByRole("button", { name: /Lettre neuve/ });
+    expect(lireReception).toHaveBeenCalledTimes(1);
+    fireEvent.click(view.getByRole("button", { name: "Menu" }));
+    fireEvent.click(await view.findByRole("link", { name: "Flux" }));
+    await view.findByRole("heading", { name: "Flux" });
+
+    const frames = new Map<number, FrameRequestCallback>();
+    let numero = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.set(++numero, callback);
+      return numero;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+    function rendre() {
+      const [id, callback] = [...frames][0];
+      frames.delete(id);
+      callback(16 * id);
+    }
+
+    fireEvent.click(view.getByRole("button", { name: "Menu" }));
+    fireEvent.click(await view.findByRole("link", { name: "Réception" }));
+    await view.findByRole("button", { name: /Lettre neuve/ });
+    expect(lireReception).toHaveBeenCalledTimes(1);
+    expect(frames.size).toBe(1);
+    if (action !== "quitter avant la peinture") {
+      rendre();
+      expect(lireReception).toHaveBeenCalledTimes(1);
+      expect(frames.size).toBe(1);
+    }
+    if (action === "afficher") {
+      rendre();
+      expect(lireReception).toHaveBeenCalledTimes(2);
+    }
+    view.unmount();
+    expect(frames.size).toBe(0);
+  },
+);
+
 it("restaure la section, la position et la ligne pendant qu’une actualisation attend le réseau", async () => {
   window.history.replaceState(null, "", "/reception");
   const { view, lireReception, fetchMock } = ouvrir();
@@ -168,7 +210,6 @@ it("restaure la section, la position et la ligne pendant qu’une actualisation 
   fireEvent.click(await view.findByRole("link", { name: "Réception" }));
   const retrouvee = await view.findByRole("button", { name: /Lettre relue/ });
   expect(location.pathname).toBe("/reception");
-  expect(lireReception).toHaveBeenCalledTimes(2);
   expect(document.activeElement).toBe(retrouvee);
   expect(retrouvee.closest("section")?.dataset.section).toBe("deja_vus");
   expect(view.getByRole("main").scrollTop).toBe(164);
@@ -178,6 +219,7 @@ it("restaure la section, la position et la ligne pendant qu’une actualisation 
   expect(document.activeElement).toBe(retrouvee);
   expect(view.getByRole("main").scrollTop).toBe(164);
   vi.stubGlobal("innerWidth", largeur);
+  await waitFor(() => expect(lireReception).toHaveBeenCalledTimes(2));
   repondre(Response.json({ ...boiteActualisee(), revision: 3 }));
   const arrivee = await view.findByRole("button", { name: /Lettre arrivée/ });
   expect(within(arrivee).getByText("Non lu")).toBeTruthy();

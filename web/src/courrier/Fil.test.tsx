@@ -323,10 +323,12 @@ it("revient immédiatement en Réception et ignore le corps tardif du premier fi
   );
   fireEvent.click(vue.getByRole("button", { name: /Retour/ }));
   const suivante = await vue.findByRole("button", { name: /2\/jardin/ });
-  expect(
-    fetch.mock.calls.filter(([c]) => c.endsWith("/views/reception")),
-  ).toHaveLength(2);
   expect(document.activeElement?.getAttribute("data-fil")).toBe(plan);
+  await waitFor(() =>
+    expect(
+      fetch.mock.calls.filter(([c]) => c.endsWith("/views/reception")),
+    ).toHaveLength(2),
+  );
   fireEvent.click(suivante);
   await vue.findByRole("heading", { name: "Jardin actuel" });
   const doc = () =>
