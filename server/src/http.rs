@@ -102,3 +102,22 @@ fn has_vite_fingerprint(path: &str) -> bool {
     hash.iter()
         .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{body::Body, http::header::CONTENT_TYPE};
+    use tower::ServiceExt;
+
+    use super::*;
+    use crate::test_support::TestApp;
+
+    #[tokio::test]
+    async fn health_returns_ok() -> Result<(), Error> {
+        let app = TestApp::new()?;
+        let request = Request::get("/api/v1/health").body(Body::empty())?;
+        let response = app.router().oneshot(request).await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[CONTENT_TYPE], "application/json");
+        Ok(())
+    }
+}

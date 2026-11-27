@@ -55,11 +55,21 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TestApp;
+
+    fn assert_current_schema(db: &Database) -> Result<(), Error> {
+        let reader = db.reader()?;
+        let version: u32 = reader.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        assert_eq!(version, u32::try_from(MIGRATIONS.dirs().count())?);
+        let id: u32 = reader.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+        assert_eq!(id, 0x506C6900);
+        Ok(())
+    }
 
     #[test]
     fn readers_keep_the_committed_schema_during_a_write() -> Result<(), Error> {
-        let dir = tempfile::tempdir()?;
-        let database = Database::open(dir.path())?;
+        let app = TestApp::new()?;
+        let database = &app.db;
         let mut writer = database.writer()?;
         assert!(writer.query_row("PRAGMA foreign_keys", [], |row| row.get::<_, bool>(0))?);
         let transaction = writer.transaction()?;
@@ -88,23 +98,58 @@ mod tests {
     }
 
     #[test]
-    fn migrations_survive_restart_and_reject_a_newer_schema() -> Result<(), Error> {
-        let dir = tempfile::tempdir()?;
-        drop(Database::open(dir.path())?);
-        let database = Database::open(dir.path())?;
-        let conn = database.reader()?;
-        let mode: String = conn.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
-        assert_eq!(mode, "wal");
-        let version: u32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        assert!(version >= 1);
-        let id: u32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
-        assert_eq!(id, 0x506C6900);
-        drop(conn);
-        database
+    fn migrations_apply_to_an_empty_database_and_survive_restart() -> Result<(), Error> {
+        let app = TestApp::new()?;
+        assert_current_schema(&app.db)?;
+        app.db.writer()?.execute_batch(
+            "CREATE TABLE restart_probe (id INTEGER PRIMARY KEY);
+             INSERT INTO restart_probe VALUES (42);",
+        )?;
+
+        let restarted = app.reopen()?;
+        assert_current_schema(&restarted.db)?;
+        let reader = restarted.db.reader()?;
+        let saved: i64 = reader.query_row("SELECT id FROM restart_probe", [], |row| row.get(0))?;
+        assert_eq!(saved, 42);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_a_newer_schema() -> Result<(), Error> {
+        let app = TestApp::new()?;
+        let future_version = u32::try_from(MIGRATIONS.dirs().count())? + 1;
+        app.db
             .writer()?
-            .pragma_update(None, "user_version", version + 1)?;
-        drop(database);
-        assert!(Database::open(dir.path()).is_err());
+            .pragma_update(None, "user_version", future_version)?;
+        assert!(app.reopen().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn uses_wal() -> Result<(), Error> {
+        let app = TestApp::new()?;
+        let mode: String = app
+            .db
+            .reader()?
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
+        assert_eq!(mode, "wal");
+        Ok(())
+    }
+
+    #[test]
+    fn can_create_and_query_an_fts5_table() -> Result<(), Error> {
+        let app = TestApp::new()?;
+        let writer = app.db.writer()?;
+        writer.execute_batch(
+            "CREATE VIRTUAL TABLE search_probe USING fts5(subject);
+             INSERT INTO search_probe VALUES ('message de test');",
+        )?;
+        let subject: String = writer.query_row(
+            "SELECT subject FROM search_probe WHERE search_probe MATCH 'message'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(subject, "message de test");
         Ok(())
     }
 }

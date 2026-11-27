@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := check
-.PHONY: dev lint build check
+.PHONY: dev lint build test check
 
 dev lint build: web/node_modules/.installed .env.example
 
@@ -15,7 +15,11 @@ build:
 	npm --prefix web run build
 	cargo build --manifest-path server/Cargo.toml --locked --release
 
-check: lint build
+test: web/node_modules/.installed
+	cargo test --manifest-path server/Cargo.toml --locked
+	npm --prefix web test
+
+check: lint build test
 
 web/node_modules/.installed: web/package.json web/package-lock.json
 	npm --prefix web ci

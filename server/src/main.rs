@@ -1,5 +1,7 @@
 mod db;
 mod http;
+#[cfg(test)]
+mod test_support;
 
 use std::{env, path::PathBuf, sync::Arc};
 

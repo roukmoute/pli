@@ -1,8 +1,13 @@
 import solid from "@solidjs/vite-plugin";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [solid()],
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test-setup.ts"],
+    unstubGlobals: true,
+  },
   server: {
     host: "127.0.0.1",
     strictPort: true,

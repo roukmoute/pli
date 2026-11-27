@@ -15,7 +15,8 @@ Ouvrez <http://127.0.0.1:5173>. L’accueil vérifie la disponibilité du serveu
 | `make dev` | Lance le serveur Rust et Vite avec rechargement du front. |
 | `make lint` | Vérifie le format Rust, lance Clippy sur toutes les cibles avec les avertissements en erreur, puis Biome et TypeScript en mode strict. |
 | `make build` | Construit `web/dist/`, puis le binaire `server/target/release/webmail-server`. |
-| `make check` | Exécute les vérifications de `make lint` et la compilation de `make build`. |
+| `make test` | Exécute les tests Rust et les tests du front une fois. |
+| `make check` | Lance le lint, compile le projet et exécute les deux suites de tests. |
 
 Ces commandes installent les dépendances front avec `npm ci` au premier lancement et lorsque le manifeste ou son verrou change. Après `make build`, lancez le binaire depuis la racine. L’API et l’accueil sont alors accessibles sur le même port.
 
@@ -24,6 +25,19 @@ Ces commandes installent les dépendances front avec `npm ci` au premier lanceme
 ```
 
 Dans un second terminal, `curl -s http://127.0.0.1:8080/api/v1/health` renvoie `{"status":"ok"}` si la lecture SQLite réussit.
+
+## Écrire et lancer un test
+
+**Rust.** Ajoutez un `#[test]` au module `tests` du fichier concerné. Pour tester une route, utilisez `#[tokio::test]`. L’instance créée par `let app = crate::test_support::TestApp::new()?;` conserve la base SQLite temporaire migrée, accessible par `app.db`, pendant toute sa portée. Importez `tower::ServiceExt` pour appeler le routeur en mémoire avec `app.router().oneshot(request).await?`. [Exemple de test HTTP](server/src/http.rs)
+
+**Front.** Placez un fichier `*.test.tsx` à côté du composant ou `*.test.ts` à côté du module. Montez un composant avec `render` et attendez le texte affiché avec `findByText`. Pour le client HTTP, simulez `fetch` avec `vi.stubGlobal`. Vitest utilise jsdom, nettoie les composants montés et restaure les variables globales simulées entre les tests. [Test du composant](web/src/App.test.tsx) · [Test du client HTTP](web/src/sync/api.test.ts)
+
+Depuis la racine, `make test` prépare les dépendances et lance les deux suites. Pour cibler une suite ou un fichier, utilisez les commandes suivantes.
+
+| Suite | Toute la suite | Un seul fichier |
+| --- | --- | --- |
+| Rust | `cargo test --manifest-path server/Cargo.toml --locked` | `cargo test --manifest-path server/Cargo.toml --locked db::tests::` pour `server/src/db.rs` |
+| Front | `npm --prefix web test` | `npm --prefix web test -- src/sync/api.test.ts` |
 
 ## Configuration
 
@@ -56,3 +70,4 @@ set +a
 | Journalisation | tracing 0.1.44, tracing-subscriber 0.3.23 |
 | Interface | Node 24.22.3, Vite 8.1.7, SolidJS et `@solidjs/web` 2.0.4, `@solidjs/vite-plugin` 3.0.1 |
 | Vérification du front | Biome 2.5.15, TypeScript 7.0.2 |
+| Tests du front | Vitest 5.0.5, jsdom 31.0.1, `@solidjs/testing-library` 1.0.0-rc.2 pour Solid 2 |
