@@ -1,5 +1,6 @@
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
+import { lireDossiers, lirePage } from "./pages-api";
 import { creerCourrier, type Vue } from "./vues";
 
 const premiere = {
@@ -22,6 +23,7 @@ it("partage une requête en cours et conserve la dernière page en cas de coupur
   vi.stubGlobal("fetch", requete);
   const courrier = creerCourrier(5);
   const entree = courrier.obtenirVue("reception");
+  expect(entree.repere).toEqual({ defilement: 0, section: "nouveaux" });
   const premiereLecture = courrier.chargerVue("reception");
   expect(courrier.chargerVue("reception")).toBe(premiereLecture);
   expect(entree.etat()).toEqual({ statut: "chargement" });
@@ -75,6 +77,10 @@ it.each([
   const compte = creerCourrier(5);
   await compte.chargerVue(vue);
   expect(compte.obtenirVue(vue).etat()).toEqual({ statut: "erreur" });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(corps)));
+  await expect(lirePage(5, vue)).rejects.toThrow(
+    "La liste reçue ne correspond pas à la boîte ouverte.",
+  );
 });
 
 it("redemande une liste en erreur et isole un dossier physique d’une vue logique", async () => {
@@ -109,6 +115,10 @@ it("écarte les dossiers masqués et permet de reprendre un catalogue illisible"
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(corps)));
     await compte.dossiers.charger();
     expect(compte.dossiers.etat()).toEqual({ statut: "erreur" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(corps)));
+    await expect(lireDossiers()).rejects.toThrow(
+      "Liste de dossiers illisible.",
+    );
   }
   const visible = { id: 8, path: "Verger", role: null, hidden: false };
   const masque = { id: 9, path: "Masqué", role: null, hidden: true };

@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { getJson } from "./api";
+import { lireDossiers, lirePage } from "./pages-api";
 
 export type Vue = "reception" | "flux" | "justificatifs" | `dossier/${number}`;
 export type Section = "nouveaux" | "deja_vus";
@@ -71,42 +71,7 @@ function ressource<T>(lire: () => Promise<T>) {
   return { etat, charger };
 }
 
-function estDossier(vue: Vue): vue is `dossier/${number}` {
-  return vue.startsWith("dossier/");
-}
-
-function lirePage(compte: number, vue: Vue): Promise<PageFils> {
-  const id = estDossier(vue) ? Number(vue.slice("dossier/".length)) : undefined;
-  const chemin =
-    id === undefined
-      ? (`/views/${vue}` as const)
-      : (`/folders/${id}/messages` as const);
-  return getJson(chemin, (corps) => {
-    const page = corps as PageFils | null;
-    if (
-      page?.compte !== compte ||
-      (id === undefined ? page.vue !== vue : page.dossier !== id) ||
-      typeof page.couverture?.import_en_cours !== "boolean" ||
-      !Number.isInteger(page.expediteurs_en_attente) ||
-      !Array.isArray(page.nouveaux) ||
-      !Array.isArray(page.deja_vus)
-    ) {
-      throw new Error("La liste reçue ne correspond pas à la boîte ouverte.");
-    }
-    return page;
-  });
-}
-
-function lireDossiers(): Promise<Dossier[]> {
-  return getJson("/folders", (corps) => {
-    const liste = corps as { folders?: Dossier[] } | null;
-    if (!Array.isArray(liste?.folders))
-      throw new Error("Liste de dossiers illisible.");
-    return liste.folders.filter((dossier) => !dossier.hidden);
-  });
-}
-
-interface Repere {
+export interface Repere {
   defilement: number;
   section: Section;
   fil?: string;
