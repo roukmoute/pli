@@ -12,6 +12,7 @@ acceptance/generated/
 .metrics/
 playwright-report/
 test-results/
+/bench/traces/e2e/
 
 # Données locales et secrets
 data/

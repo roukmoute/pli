@@ -2,6 +2,7 @@
 .PHONY: dev lint build test check
 .PHONY: bench-up bench-down bench-seed test-integration
 .PHONY: recette-lecture
+.PHONY: e2e
 
 PYTHON_RECETTE ?= $(shell command -p -v python3 || command -v python3)
 
@@ -38,6 +39,14 @@ bench-seed:
 
 test-integration:
 	bash bench/test-integration.sh
+
+e2e: build e2e/node_modules/.installed
+	node bench/navigation.mjs --preparer
+	bash bench/avec-greenmail.sh npm --prefix e2e test
+
+e2e/node_modules/.installed: e2e/package.json e2e/package-lock.json
+	npm --prefix e2e ci
+	touch $@
 
 recette-lecture:
 	@cargo build --manifest-path server/Cargo.toml --locked --release --bin webmail-server --target-dir "$${CARGO_TARGET_DIR:-server/target}"

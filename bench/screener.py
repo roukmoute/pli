@@ -26,15 +26,21 @@ def tls_client():
     return context
 
 
-def deliver(address, subjects):
+def deliver(address, subjects, *, sender="L’Atelier <atelier@recette.test>", thread=False):
     with smtplib.SMTP_SSL(HOST, SMTPS, context=tls_client(), timeout=8) as smtp:
         smtp.login("alice@recette.test", "alice-test")
+        parent = None
         for subject in subjects:
             message = EmailMessage()
-            message["From"] = "L’Atelier <atelier@recette.test>"
+            message["From"] = sender
             message["To"] = address
             message["Subject"] = subject
             message["Message-ID"] = f"<{uuid4().hex}@recette.test>"
+            if thread:
+                if parent:
+                    message["In-Reply-To"] = parent
+                    message["References"] = parent
+                parent = message["Message-ID"]
             body = f"Lettre de l’atelier. {subject}."
             if subject == "Archive B":
                 body += "\n" + "Ligne de recette.\n" * 350
@@ -58,9 +64,10 @@ async def forward_commands(reader, writer):
         await writer.drain()
 
 
-async def serve(directory, pages=False):
-    address = f"tri-{uuid4().hex}@recette.test"
-    subjects = [f"Archive {uid}" for uid in range(1, 52)] if pages else ["Archive A", "Archive B"]
+async def serve(directory, pages=False, *, address=None, subjects=None):
+    address = address or f"tri-{uuid4().hex}@recette.test"
+    if subjects is None:
+        subjects = [f"Archive {uid}" for uid in range(1, 52)] if pages else ["Archive A", "Archive B"]
     deliver(address, subjects)
     key, cert = (directory / name for name in ("banc.key", "banc.pem"))
     subprocess.run(

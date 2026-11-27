@@ -13,7 +13,7 @@ export const tailles = [
   { width: 1440, height: 900 },
 ];
 
-function executable() {
+export function executable() {
   const personnalise = process.env.PLI_CHROMIUM_BIN;
   if (personnalise) return personnalise;
   return [
