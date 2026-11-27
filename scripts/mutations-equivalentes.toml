@@ -49,3 +49,8 @@ sha256 = "4048540733f184fbf82d94c49c52d3bd9812e15111e67b5384b507177df19345"
 ["web/src/admin/ProfileForm.tsx".sites]
 "46:54 ?? -> ||" = "Le FormData vide redonne une chaîne vide avec les deux opérateurs."
 "78:24 ?? -> ||" = "Le profil vaut un objet ou est absent. Les deux opérateurs choisissent le même préréglage."
+
+["web/src/courrier/position.ts"]
+sha256 = "14d4ac69bf9a89eff62f4393f3ba8542a53cc90f5a1a56046215a59d5ea3b384"
+["web/src/courrier/position.ts".sites]
+"29:60 ?? -> ||" = "Array.find renvoie un bouton HTML ou undefined. Les deux opérateurs choisissent la même ligne de repli."

@@ -1,0 +1,11 @@
+{
+  "compte": 3,
+  "vue": "reception",
+  "nouveaux": [],
+  "deja_vus": [],
+  "revision": 2,
+  "expediteurs_en_attente": 4,
+  "curseur_suivant": null,
+  "couverture": { "import_en_cours": false, "proportion_indexee": 1 },
+  "compteurs": { "reception": 0, "flux": 0, "justificatifs": 0 }
+}

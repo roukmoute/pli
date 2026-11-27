@@ -34,7 +34,7 @@ function Dossier(props: { cache: CacheCourrier }) {
           const dossiers = props.cache.dossiers.etat();
           if (dossiers.statut === "pret")
             return (
-              dossiers.valeur.find((d) => d.id === id)?.path ?? t("folders")
+              dossiers.valeur.find((d) => d.id === id)?.path || t("folders")
             );
           return t("folders");
         };

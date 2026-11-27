@@ -4,6 +4,7 @@ import { t } from "../i18n";
 import { Icone } from "../icons/Icone";
 import type { Courrier, Fil, Section, Vue } from "../sync";
 import styles from "./courrier.module.css";
+import { memoriserAncre, restaurerPosition } from "./position";
 
 const dates = new Intl.DateTimeFormat("fr", {
   day: "numeric",
@@ -86,29 +87,12 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
     }
   });
 
-  function lignes() {
-    return Array.from(zone.querySelectorAll<HTMLButtonElement>("[data-fil]"));
-  }
-
   function memoriserDefilement() {
     entree.repere.defilement = zone.scrollTop;
     if (image !== undefined) return;
     image = requestAnimationFrame(() => {
       image = undefined;
-      const haut = zone.getBoundingClientRect().top;
-      const visible = lignes().find(
-        (ligne) => ligne.getBoundingClientRect().bottom > haut,
-      );
-      if (visible?.dataset.fil) {
-        entree.repere.ancre = {
-          fil: visible.dataset.fil,
-          decalage: visible.getBoundingClientRect().top - haut,
-        };
-        entree.repere.section =
-          visible.closest("section")?.dataset.section === "deja_vus"
-            ? "deja_vus"
-            : "nouveaux";
-      }
+      memoriserAncre(zone, entree.repere);
     });
   }
 
@@ -118,22 +102,7 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
   }
 
   onSettled(() => {
-    zone.scrollTop = entree.repere.defilement;
-    const presentes = lignes();
-    const ancre = entree.repere.ancre;
-    const premiere = presentes.find(
-      (element) => element.dataset.fil === ancre?.fil,
-    );
-    if (ancre && premiere) {
-      zone.scrollTop +=
-        premiere.getBoundingClientRect().top -
-        zone.getBoundingClientRect().top -
-        ancre.decalage;
-    }
-    const ligne = presentes.find(
-      (element) => element.dataset.fil === entree.repere.fil,
-    );
-    ligne?.focus({ preventScroll: true });
+    restaurerPosition(zone, entree.repere);
     void props.courrier.chargerVue(props.vue);
     return () => {
       if (image !== undefined) cancelAnimationFrame(image);
