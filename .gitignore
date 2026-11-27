@@ -21,12 +21,11 @@ data/
 *.pem
 *.key
 
-# Fichiers de travail de kanb-ian
-Kanban/.runs/
-Kanban/.leases/
-Kanban/.downloads/
-Kanban/.lead/
-Kanban/.journal/
+# Pilotage et références de travail conservés en local
+/Kanban/
+/AGENTS.md
+/CLAUDE.md
+/docs/reference/
 
 # Éditeurs et systèmes d’exploitation
 .idea/
