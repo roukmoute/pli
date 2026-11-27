@@ -245,3 +245,41 @@ pub(super) async fn modifier(
             .collect(),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::TestApp;
+
+    #[test]
+    fn distingue_les_refus_et_le_succes_partiel() {
+        use Etat::{Absent, Confirme, NonConfirme, Partiel};
+        for (lettres, attendu) in [
+            (vec![], Absent),
+            (vec![Absent], Absent),
+            (vec![Absent, NonConfirme], NonConfirme),
+            (vec![Confirme, Confirme], Confirme),
+            (vec![Confirme, Absent], Partiel),
+            (vec![NonConfirme, Confirme], Partiel),
+        ] {
+            assert_eq!(bilan(&lettres), attendu);
+        }
+    }
+
+    #[test]
+    fn une_lettre_disparue_avant_la_confirmation_reste_absente() -> Result<(), Error> {
+        let app = TestApp::new()?;
+        let action = Action {
+            ids: vec!["1-1-3".into()],
+            vue: None,
+            indicateur: Indicateur::Lu,
+            valeur: true,
+        };
+        let etats = BTreeMap::from([(3, Etat::Confirme), (8, Etat::NonConfirme)]);
+        assert_eq!(
+            confirmer(&app.db, 1, 1, 1, &action, etats)?,
+            BTreeMap::from([(3, Etat::Absent), (8, Etat::NonConfirme)])
+        );
+        Ok(())
+    }
+}

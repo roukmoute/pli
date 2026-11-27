@@ -584,10 +584,85 @@ it("annonce la sélection de la page et conserve ses cases pendant une visite du
   fireEvent.click(casePage());
   await waitFor(() => expect(caseNeuve().checked).toBe(false));
   expect(caseRelue().checked).toBe(false);
+  expect(casePage().indeterminate).toBe(false);
   expect(view.getByRole("status").textContent).toBe(
     "0 fils sélectionnés sur 2",
   );
   expect(
     fetchMock.mock.calls.some(([url]) => String(url).includes("/threads/")),
   ).toBe(false);
+});
+
+it("cible le fil étoilé, annonce les refus et rend le focus après la confirmation du lot", async () => {
+  const { view, fetchMock, lireReception } = ouvrir();
+  const globale = await view.findByRole<HTMLInputElement>("checkbox", {
+    name: "Sélectionner la page",
+  });
+  const ligne = view.getByRole("button", { name: /Lettre neuve/ })
+    .parentElement as HTMLElement;
+  const etoile = within(ligne).getByRole("button", { name: "Étoile" });
+  const appels: { ids: string[]; indicateur: string; valeur: boolean }[] = [];
+  let refus: string[] = [];
+  vi.stubGlobal("fetch", (url: RequestInfo | URL, init: RequestInit) => {
+    if (url !== "/api/v1/messages/flags") return fetchMock(url);
+    const requete = JSON.parse(String(init.body));
+    appels.push(requete);
+    return Promise.resolve(
+      Response.json(
+        requete.ids.map((id: string) => ({
+          id,
+          etat: refus.includes(id) ? "non_confirme" : "confirme",
+        })),
+      ),
+    );
+  });
+  fireEvent.click(etoile);
+  await waitFor(() => {
+    expect(lireReception).toHaveBeenCalledTimes(2);
+    expect(globale.disabled).toBe(false);
+  });
+  expect(appels[0]).toEqual({
+    vue: "reception",
+    ids: ["neuve"],
+    indicateur: "etoile",
+    valeur: false,
+  });
+  expect(view.getByRole("status").textContent).toBe(
+    "0 fils sélectionnés sur 2",
+  );
+  fireEvent.click(globale);
+  await view.findByText("2 fils sélectionnés sur 2");
+  const lire = () => view.getByRole("button", { name: "Marquer comme lu" });
+  refus = ["neuve", "relue"];
+  fireEvent.click(lire());
+  expect((await view.findByRole("alert")).textContent).toBe(
+    "Modification non confirmée pour 2 fils.",
+  );
+  await waitFor(() => expect(globale.disabled).toBe(false));
+  refus = ["relue"];
+  const focus = vi.spyOn(globale, "focus");
+  fireEvent.click(lire());
+  await view.findByText("Modification non confirmée pour 1 fil.");
+  expect(focus).not.toHaveBeenCalled();
+  expect(globale.indeterminate).toBe(true);
+  await waitFor(() => expect(globale.disabled).toBe(false));
+  refus = [];
+  fireEvent.click(view.getByRole("button", { name: "Marquer comme non lu" }));
+  await waitFor(() =>
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true }),
+  );
+  expect(appels.at(-1)).toEqual({
+    vue: "reception",
+    ids: ["relue"],
+    indicateur: "lu",
+    valeur: false,
+  });
+  expect(appels[1]).toEqual({
+    vue: "reception",
+    ids: ["neuve", "relue"],
+    indicateur: "lu",
+    valeur: true,
+  });
+  expect(document.activeElement).toBe(globale);
+  expect(window.location.pathname).toBe("/");
 });

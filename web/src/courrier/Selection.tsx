@@ -8,11 +8,11 @@ export function BarreSelection(props: { ids: string[]; selection: Selection }) {
   const lot = () => props.ids.filter((id) => selection.choisis().has(id));
   const nombre = () => lot().length;
   const total = () => props.ids.length;
-  let controlePage: HTMLInputElement | undefined;
+  let controlePage!: HTMLInputElement;
   async function marquer(valeur: boolean, bouton: HTMLButtonElement) {
     await selection.marquer(lot(), "lu", valeur);
     if (!bouton.isConnected && document.activeElement === document.body)
-      controlePage?.focus({ preventScroll: true });
+      controlePage.focus({ preventScroll: true });
   }
   return (
     <div class={styles.selection}>

@@ -209,30 +209,25 @@ async fn applique_les_indicateurs_par_lot_et_isole_chaque_identifiant() -> Resul
     let post = |v| request(&router, Method::POST, path, Some(&cookie), v);
     let marque = |ids: Value, indicateur: &str, valeur: bool| json!({ "ids":ids, "indicateur":indicateur, "valeur":valeur });
     let etat = |id: &str, etat: &str| json!({"id":id,"etat":etat});
-    let appel = marque(json!(["1-1-3"]), "lu", true);
+    let lus = |ids| marque(ids, "lu", true);
+    let appel = lus(json!(["1-1-3"]));
     assert_eq!(
         request(&router, Method::POST, path, None, appel.clone())
             .await
             .status,
         StatusCode::UNAUTHORIZED
     );
+    assert_eq!(post(lus(json!([]))).await.status, StatusCode::BAD_REQUEST);
     assert_eq!(
-        post(marque(json!([]), "lu", true)).await.status,
+        post(lus(json!(vec!["inconnu"; 101]))).await.status,
         StatusCode::BAD_REQUEST
     );
-    assert_eq!(
-        post(marque(json!(vec!["inconnu"; 101]), "lu", true))
-            .await
-            .status,
-        StatusCode::BAD_REQUEST
-    );
-    let plein = post(marque(json!(vec!["inconnu"; 100]), "lu", true)).await;
+    let plein = post(lus(json!(vec!["inconnu"; 100]))).await;
     assert_eq!(plein.status, StatusCode::OK);
     assert_eq!(plein.body.as_array().unwrap().len(), 100);
-    assert_eq!(
-        post(marque(json!(["1-1-3"]), "autre", true)).await.status,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
+    let mut inconnu = appel.clone();
+    inconnu["indicateur"] = "autre".into();
+    assert_eq!(post(inconnu).await.status, StatusCode::UNPROCESSABLE_ENTITY);
     let lire_flags = |compte, dossier, uid| -> Result<String, Error> {
         Ok(app.db.reader()?.query_row(
             "SELECT flags FROM messages WHERE (account_id,folder_id,uid)=(?1,?2,?3)",
@@ -289,7 +284,7 @@ async fn applique_les_indicateurs_par_lot_et_isole_chaque_identifiant() -> Resul
     assert_eq!(avant["nouveaux"][0]["etoile"], true);
     assert_eq!(etoiler().await.body[0], etat("1-1-4", "confirme"));
     assert_eq!(page().await.body, avant);
-    let lot = post(marque(json!(["1-1-3", "1-1-4"]), "lu", true)).await;
+    let lot = post(lus(json!(["1-1-3", "1-1-4"]))).await;
     assert_eq!(
         lot.body,
         json!([etat("1-1-3", "confirme"), etat("1-1-4", "absent")])

@@ -133,3 +133,45 @@ it("écarte les dossiers masqués et permet de reprendre un catalogue illisible"
     perime: false,
   });
 });
+
+it("actualise la vue de l’action et les autres pages qui contiennent une cible", async () => {
+  const courrier = creerCourrier(5);
+  const source = vi.fn(async (url: string) => {
+    if (url.endsWith("/flags"))
+      return Response.json([{ id: "b", etat: "confirme" }]);
+    if (url.includes("/threads/")) return Response.json([]);
+    if (url.includes("folders/"))
+      return Response.json({
+        ...premiere,
+        vue: undefined,
+        dossier: 8,
+        deja_vus: [{ id: "b" }],
+      });
+    return Response.json({ ...premiere, vue: url.split("/").at(-1) });
+  });
+  vi.stubGlobal("fetch", source);
+  const entree = courrier.obtenirVue("reception");
+  await Promise.all([
+    entree.charger(),
+    courrier.chargerVue("dossier/8"),
+    courrier.chargerVue("flux"),
+  ]);
+  courrier.obtenirVue("justificatifs");
+  const fermer = courrier.lectures.consulter("b");
+  source.mockClear();
+  await entree.selection.marquer(["b"], "lu", false);
+  expect(source.mock.calls.map(([url]) => url).sort()).toEqual([
+    "/api/v1/folders/8/messages",
+    "/api/v1/messages/flags",
+    "/api/v1/threads/b",
+    "/api/v1/views/reception",
+  ]);
+  source.mockClear();
+  await entree.selection.marquer(["b"], "etoile", true);
+  expect(source.mock.calls.map(([url]) => url).sort()).toEqual([
+    "/api/v1/folders/8/messages",
+    "/api/v1/messages/flags",
+    "/api/v1/views/reception",
+  ]);
+  fermer();
+});

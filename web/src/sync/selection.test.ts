@@ -12,6 +12,8 @@ it("réserve le lot pendant la confirmation et garde les cibles à réessayer", 
   vi.stubGlobal("fetch", fetch);
   const actualiser = vi.fn(async () => {});
   const choix = creerSelection("dossier/8", actualiser);
+  expect(choix.echecs()).toBe(0);
+  expect(choix.enCours()).toBe(false);
   choix.cocher(["a", "b", "c"], true);
   choix.cocher(["c"], false);
   await choix.marquer([], "lu", false);
@@ -19,6 +21,7 @@ it("réserve le lot pendant la confirmation et garde les cibles à réessayer", 
   const ecriture = choix.marquer(["a", "b"], "lu", true);
   await choix.marquer(["a"], "etoile", true);
   expect(choix.enCours()).toBe(true);
+  expect(choix.echecs()).toBe(0);
   expect(fetch).toHaveBeenCalledTimes(1);
   const [url, options] = fetch.mock.calls[0];
   expect(url).toBe("/api/v1/messages/flags");
