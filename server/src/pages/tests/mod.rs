@@ -50,8 +50,9 @@ fn lettre(
     db.execute(
         "INSERT INTO messages(account_id,folder_id,uidvalidity,uid,thread_id,sender_address,
          sender_name,subject,received_at,recipients,flags,size,has_attachments,snippet)
-         SELECT account_id,id,1,?2,?3,?4,'Noa','Lettre '||?2,100,'{}',?5,15,0,'Extrait '||?2
-         FROM folders WHERE id=?1 ON CONFLICT(account_id,folder_id,uidvalidity,uid) DO NOTHING",
+         VALUES((SELECT account_id FROM folders WHERE id=?1),?1,1,?2,?3,?4,'Noa','Lettre '||?2,
+                100,'{}',?5,15,0,'Extrait '||?2)
+         ON CONFLICT(account_id,folder_id,uidvalidity,uid) DO NOTHING",
         params![dossier, uid, fil, adresse, flags.to_string()],
     )
 }

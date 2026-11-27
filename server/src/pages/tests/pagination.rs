@@ -4,8 +4,7 @@ use super::*;
 async fn curseurs_stables_sur_dates_identiques_et_requetes_isolees() -> Result<(), Error> {
     let app = boite()?;
     let router = app.router();
-    let imap = std::net::TcpListener::bind("127.0.0.1:0")?;
-    imap.set_nonblocking(true)?;
+    let imap = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     {
         let db = app.db.writer()?;
         db.execute(
@@ -93,9 +92,10 @@ async fn curseurs_stables_sur_dates_identiques_et_requetes_isolees() -> Result<(
     assert_eq!(statut, StatusCode::OK);
     assert_eq!(autre["compte"], 2);
     assert_eq!(autre["compteurs"]["reception"], 0);
-    assert_eq!(
-        imap.accept().unwrap_err().kind(),
-        std::io::ErrorKind::WouldBlock
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(20), imap.accept())
+            .await
+            .is_err()
     );
     Ok(())
 }

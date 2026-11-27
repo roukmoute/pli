@@ -33,7 +33,7 @@ sha256 = "b3057706fc16936c56c4bff741cee73fa802353a3efe062c8f4f91047c79018f"
 "227:37 false -> true" = "L’écriture du repère échoue dans les deux modes SPECIAL-USE."
 
 ["server/src/session/tests/headers.rs"]
-sha256 = "46827ac5a909250865abae7b85f377e4059a161127130b4d4b2659f2e6bcb1cb"
+sha256 = "391ab8bad50dc673b25f8ad024246b4368499b85f795cef9cba8b4450f8fcce6"
 ["server/src/session/tests/headers.rs".sites]
 "49:43 false -> true" = "L’annonce SPECIAL-USE et la commande LIST attendue varient ensemble pour INBOX seule."
 "51:18 1 -> 0" = "L’UID 0 ajouté à SEARCH est en dehors de la plage vérifiée."

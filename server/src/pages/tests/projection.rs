@@ -174,6 +174,47 @@ async fn import_partiel_reprise_et_revision_sont_atomiques() -> Result<(), Error
 }
 
 #[test]
+fn les_modifications_de_fils_actualisent_uniquement_le_compte_concerne() -> Result<(), Error> {
+    let app = boite()?;
+    let db = app.db.writer()?;
+    let vue = |compte| -> Result<Page, Error> {
+        let mut lecteur = app.db.reader()?;
+        Ok(storage::read(
+            &mut lecteur,
+            compte,
+            Scope::View("reception".into()),
+            20,
+            None,
+        )?
+        .unwrap())
+    };
+    let bob = serde_json::to_value(vue(2)?)?;
+    let adresse = "noa@recette.test";
+    lettre(&db, 1, 3, "réponse", adresse, json!([]))?;
+    lettre(&db, 1, 4, "parent", adresse, json!([r"\Seen"]))?;
+    db.execute(
+        "UPDATE messages SET thread_id='parent',flags=?1 WHERE uid=3",
+        [json!([r"\Seen"]).to_string()],
+    )?;
+    let fusion = vue(1)?;
+    assert_eq!(fusion.compteurs.reception, 1);
+    assert!(fusion.nouveaux.is_empty());
+    assert_eq!(fusion.deja_vus[0].nombre_messages, 2);
+    db.execute("DELETE FROM messages WHERE uid=4", [])?;
+    let restant = vue(1)?;
+    assert_eq!(restant.deja_vus[0].objet, "Lettre 3");
+    assert_eq!(restant.deja_vus[0].nombre_messages, 1);
+    assert!(restant.revision > fusion.revision);
+    db.execute("DELETE FROM folders WHERE id=1", [])?;
+    let retire = vue(1)?;
+    assert_eq!(retire.compteurs.reception, 0);
+    assert!(retire.deja_vus.is_empty());
+    assert!(retire.revision > restant.revision);
+    assert_eq!(serde_json::to_value(vue(2)?)?, bob);
+    Ok(())
+}
+
+#[test]
 fn une_base_deja_importee_reconstruit_les_listes_et_utilise_l_index_de_page() -> Result<(), Error> {
     let mut db = Connection::open_in_memory()?;
     for migration in [
@@ -200,9 +241,10 @@ fn une_base_deja_importee_reconstruit_les_listes_et_utilise_l_index_de_page() ->
     );
     let plan = db
         .prepare(&sql)?
-        .query_map(params![1, "reception", 51, 100, "historique"], |r| {
-            r.get::<_, String>(3)
-        })?
+        .query_map(
+            params![page.compte, "reception", 51, 100, "historique"],
+            |r| r.get::<_, String>(3),
+        )?
         .collect::<rusqlite::Result<Vec<_>>>()?
         .join("\n");
     assert!(plan.contains("SEARCH p USING INDEX list_page"), "{plan}");

@@ -156,13 +156,18 @@ mod tests {
                     }
                     Some("taille=2") => ["a", "b"],
                     Some("taille=2&curseur=suite") => ["c", "d"],
+                    None if appel == 3 => {
+                        return Json(json!({
+                            "nouveaux": [], "deja_vus": [], "couverture": {"import_en_cours": true}
+                        }));
+                    }
                     None => ["e", "f"],
                     _ => panic!("Requête de page inattendue"),
                 };
                 Json(
                     json!({"nouveaux":[{"id":ids[0]}],"deja_vus":[{"id":ids[1]}],
                     "curseur_suivant":"suite","expediteurs_en_attente":3,"compteurs":{"reception":8},
-                    "couverture":{"attendus":9,"indexes":8,"import_en_cours":appel<4}}),
+                    "couverture":{"attendus":9,"indexes":8,"import_en_cours":appel<6}}),
                 )
             }
         });
@@ -208,6 +213,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(world.json().unwrap()["couverture"]["import_en_cours"], true);
+        assert_eq!(ids(&world.json().unwrap()).unwrap(), ["e", "f"]);
         world.lire_pendant_import(false).await.unwrap();
         assert_eq!(
             world.json().unwrap()["couverture"]["import_en_cours"],

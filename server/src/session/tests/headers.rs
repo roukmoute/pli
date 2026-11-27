@@ -136,5 +136,23 @@ async fn fetches_fifty_recent_uids_first_then_polls_inbox_with_the_original_boun
         serde_json::from_str::<Value>(&data.5)?,
         json!({"to":[{"address":"b@recette.test","name":null}],"cc":[],"bcc":[]})
     );
+    drop(db);
+    let page = request(
+        &router,
+        Method::GET,
+        "/api/v1/views/reception",
+        Some(cookie),
+        Value::Null,
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK);
+    // Deux UID sur les 51 trouvés existent encore au FETCH. Le sondage suivant
+    // apporte un nouvel expéditeur sans remplacer la couverture de l’historique.
+    assert_eq!(
+        page.body["couverture"],
+        json!({"indexes":2,"attendus":2,"import_en_cours":false,"proportion_indexee":1.0})
+    );
+    assert_eq!(page.body["compteurs"]["reception"], 2);
+    assert_eq!(page.body["expediteurs_en_attente"], 1);
     Ok(())
 }
