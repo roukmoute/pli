@@ -305,6 +305,9 @@ it("charge les courriers et les adresses suivantes dans leur propre catalogue", 
 
 it("préserve l’ordre date puis identifiant et les indicateurs des conversations réunies", () => {
   expect(comparerFils(ancien, { ...ancien })).toBe(0);
+  const suivant = { ...ancien, id: `${ancien.id} bis` };
+  expect(comparerFils(ancien, suivant)).toBeGreaterThan(0);
+  expect(comparerFils(suivant, ancien)).toBeLessThan(0);
   const ajoute = {
     ...ancien,
     id: "commun",
