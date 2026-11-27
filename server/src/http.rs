@@ -120,4 +120,27 @@ mod tests {
         assert_eq!(response.headers()[CONTENT_TYPE], "application/json");
         Ok(())
     }
+
+    #[tokio::test]
+    async fn caches_only_successful_or_revalidated_fingerprinted_assets() -> Result<(), Error> {
+        let asset = "/assets/app-Ab12_3-x.js";
+        let immutable = "public, max-age=31536000, immutable";
+        for (path, status, policy) in [
+            (asset, StatusCode::OK, immutable),
+            (asset, StatusCode::NOT_MODIFIED, immutable),
+            (asset, StatusCode::NOT_FOUND, "no-cache"),
+            ("/app-Ab12_3-x.js", StatusCode::OK, "no-cache"),
+            ("/assets/app.js", StatusCode::OK, "no-cache"),
+            ("/assets/app-Ab12.3-x.js", StatusCode::OK, "no-cache"),
+        ] {
+            let files = Router::new()
+                .fallback(move || async move { status })
+                .layer(middleware::from_fn(cache_static));
+            let response = files
+                .oneshot(Request::get(path).body(Body::empty())?)
+                .await?;
+            assert_eq!(response.headers()[CACHE_CONTROL], policy, "{status} {path}");
+        }
+        Ok(())
+    }
 }

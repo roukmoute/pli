@@ -70,4 +70,4 @@ set +a
 | Journalisation | tracing 0.1.44, tracing-subscriber 0.3.23 |
 | Interface | Node 24.22.3, Vite 8.1.7, SolidJS et `@solidjs/web` 2.0.4, `@solidjs/vite-plugin` 3.0.1 |
 | Vérification du front | Biome 2.5.15, TypeScript 7.0.2 |
-| Tests du front | Vitest 5.0.5, jsdom 31.0.1, `@solidjs/testing-library` 1.0.0-rc.2 pour Solid 2 |
+| Tests du front | Vitest et `@vitest/coverage-v8` 5.1.2, jsdom 31.0.1, `@solidjs/testing-library` 1.0.0-rc.2 pour Solid 2 |

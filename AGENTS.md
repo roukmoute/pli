@@ -96,3 +96,23 @@ impl<L: LectureNonLus> Compteur<L> {
     }
 }
 ```
+
+## Qualité avant de rendre une carte
+
+Depuis la racine, lancez `scripts/qualite.sh`. Au premier passage, le script
+installe les outils de `scripts/outils.lock` dans `.outils/`. Prévoyez Python
+3.11 ou ultérieur avec `venv`, ainsi que les prérequis habituels du projet et
+une session `gh` connectée.
+
+- `scripts/qualite.sh crap` mesure Rust et TypeScript. Un score CRAP supérieur
+  à 30 bloque la remise de la carte. Testez la fonction ou simplifiez-la.
+- `scripts/qualite.sh mutation` vérifie les sources modifiées depuis le dernier
+  tag, y compris les nouveaux fichiers locaux. On peut aussi lui passer des
+  chemins. Tuez chaque mutant survivant par un test, ou nommez-le dans le
+  journal de la carte et justifiez sa survie (par exemple, un mutant équivalent).
+  `scripts/qualite.sh mutation-complete` rejoue tous les sites de mutation
+  pour le contrôle nocturne.
+- `scripts/qualite.sh dry` signale les candidats à la duplication à partir de
+  0,82 de similarité. Relisez chaque paire, puis factorisez-la ou expliquez
+  dans le journal pourquoi vous gardez les deux fonctions. Ce rapport est
+  consultatif.

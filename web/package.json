@@ -9,7 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "biome check . && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@solidjs/web": "2.0.4",
@@ -20,9 +21,10 @@
     "@solidjs/testing-library": "1.0.0-rc.2",
     "@solidjs/vite-plugin": "3.0.1",
     "@types/node": "24.19.4",
+    "@vitest/coverage-v8": "5.1.2",
     "jsdom": "31.0.1",
     "typescript": "7.0.2",
     "vite": "8.1.7",
-    "vitest": "5.0.5"
+    "vitest": "5.1.2"
   }
 }
