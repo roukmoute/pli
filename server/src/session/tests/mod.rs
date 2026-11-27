@@ -1,5 +1,6 @@
 mod folders;
 mod headers;
+mod lecture;
 
 use axum::{
     body::{Body, to_bytes},

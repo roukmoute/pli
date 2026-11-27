@@ -23,6 +23,7 @@ pub fn router(
 ) -> Result<Router, Error> {
     let sync = sync::Synchronizer::start(db.clone(), sessions.key.clone(), config.allow_test)?;
     let api = Router::new()
+        .merge(crate::lecture::router(sync.lecteur()))
         .merge(session::router(
             db.clone(),
             sessions,
@@ -60,6 +61,8 @@ pub fn router(
         "/nouveaux-expediteurs",
         "/historique-du-tri",
         "/dossier/{id}",
+        "/fil/{fil}",
+        "/fil/{fil}/message/{id}",
         "/ecrire",
     ] {
         files = files.route_service(path, ServeFile::new(root.join("index.html")));

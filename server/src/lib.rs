@@ -1,6 +1,7 @@
 mod admin;
 mod db;
 mod http;
+mod lecture;
 mod pages;
 mod session;
 mod sync;

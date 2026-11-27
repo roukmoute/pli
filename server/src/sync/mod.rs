@@ -2,6 +2,8 @@ mod discovery;
 mod header;
 mod imap;
 mod import;
+mod lecture;
+pub(crate) use lecture::Lecteur;
 mod messages;
 mod preview;
 mod store;
