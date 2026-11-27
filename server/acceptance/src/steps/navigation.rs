@@ -1,8 +1,18 @@
 use super::{Example, Problem, World, example_value, expect, parameter};
 use serde::Deserialize;
+use std::net::SocketAddr;
 use tokio::process::Command;
 
 const SCRIPT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/navigation.mjs");
+
+fn commande_navigation(adresse: SocketAddr) -> Command {
+    let mut commande = Command::new("node");
+    commande
+        .arg(SCRIPT)
+        .arg(format!("http://{adresse}"))
+        .kill_on_drop(true);
+    commande
+}
 
 #[derive(Deserialize)]
 pub(super) struct Navigation {
@@ -18,10 +28,7 @@ impl World {
         row: &Example,
     ) -> Result<bool, Problem> {
         if text == "je parcours le menu et reviens en Réception dans le navigateur" {
-            let sortie = Command::new("node")
-                .arg(SCRIPT)
-                .arg(format!("http://{}", self.address))
-                .kill_on_drop(true)
+            let sortie = commande_navigation(self.address)
                 .output()
                 .await
                 .map_err(Problem::infra)?;
@@ -57,6 +64,11 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn interrompt_la_sonde_avec_le_scenario() {
+        let commande = commande_navigation("127.0.0.1:1234".parse().unwrap());
+        assert!(commande.get_kill_on_drop());
+    }
     #[tokio::test]
     async fn verifie_les_deux_observations_recues_du_navigateur() {
         let mut world = World::new("127.0.0.1:1".parse().unwrap()).unwrap();
