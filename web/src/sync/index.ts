@@ -3,6 +3,7 @@ import { getJson } from "./api";
 export { ApiError, onSessionExpired } from "./api";
 export * from "./servers";
 export * from "./session";
+export * from "./vues";
 
 export interface ServiceHealth {
   status: "ok";
