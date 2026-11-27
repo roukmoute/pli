@@ -9,7 +9,7 @@ sources=(server web)
 crap() {
     make web/node_modules/.installed
     mkdir -p target/coverage/rust
-    cargo llvm-cov --manifest-path server/Cargo.toml --locked \
+    cargo llvm-cov --manifest-path server/Cargo.toml --locked --workspace \
         --lcov --output-path target/coverage/rust/lcov.info
     npm --prefix web run coverage
     for rapport in target/coverage/{rust,typescript}/lcov.info; do
@@ -67,12 +67,12 @@ case "${1-}" in
         exit "$statut"
         ;;
     crap)
-        scripts/outils.sh
+        scripts/outils.sh qualite
         crap
         ;;
     mutation)
         shift
-        scripts/outils.sh
+        scripts/outils.sh qualite
         if (( $# )); then
             for fichier in "$@"; do
                 if [[ ! -f "$fichier" ]]; then
@@ -86,11 +86,11 @@ case "${1-}" in
         fi
         ;;
     mutation-complete)
-        scripts/outils.sh
+        scripts/outils.sh qualite
         muter "${sources[@]}"
         ;;
     dry)
-        scripts/outils.sh && "$outils/venv/bin/dryer" --threshold 0.82 "${sources[@]}" \
+        scripts/outils.sh qualite && "$outils/venv/bin/dryer" --threshold 0.82 "${sources[@]}" \
             || echo "Le rapport de duplication n’a pas pu être produit." >&2
         ;;
     *)

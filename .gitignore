@@ -5,6 +5,9 @@ dist/
 web/dist/
 coverage/
 .outils/
+build/acceptance/
+build/acceptance-mutation/
+acceptance/generated/
 .metrics/
 playwright-report/
 test-results/

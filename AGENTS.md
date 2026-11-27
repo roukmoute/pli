@@ -116,3 +116,33 @@ une session `gh` connectée.
   0,82 de similarité. Relisez chaque paire, puis factorisez-la ou expliquez
   dans le journal pourquoi vous gardez les deux fonctions. Ce rapport est
   consultatif.
+
+## Tests d'acceptation (APS)
+
+Chaque carte de fonctionnalité traduit ses critères d’acceptation en scénarios
+Gherkin dans `features/`, avec un fichier par fonctionnalité. Écrivez les noms,
+les étapes et les exemples en français métier. Le parseur APS reconnaît les
+mots-clés anglais `Feature`, `Background`, `Scenario`, `Scenario Outline`,
+`Examples`, `Given`, `When`, `Then` et `And`. Placez les valeurs attendues dans
+la table d’exemples pour que la mutation puisse vérifier chacune d’elles.
+
+Les étapes passent par l’API HTTP du service Rust. Chaque exemple démarre le
+service sur un port local attribué par le système, avec sa propre base SQLite.
+Quand le scénario utilise du courrier, appuyez-vous sur le banc IMAP/SMTP de test.
+
+Avant de rendre une carte, lancez `scripts/acceptation.sh` depuis la racine.
+Le script utilise Babashka ou, à défaut, compile les trois outils APS avec Go
+1.22 ou ultérieur. Le premier clonage utilise la session `gh` du projet.
+Les représentations JSON et les rapports de duplication se trouvent dans
+`build/acceptance/`. Pour vérifier les scénarios ajoutés, lancez
+`scripts/acceptation.sh mutation`. Retrouvez les valeurs mutées et le bilan de
+chaque fonctionnalité dans `build/acceptance-mutation/`. L’adaptateur passe le
+chemin du JSON muté dans `PLI_ACCEPTANCE_IR` au même point d’entrée
+`acceptance/generated/<nom>/run` que celui de l’exécution normale.
+
+Pour ajouter une étape, ajoutez son texte au scénario, puis implémentez-le dans
+`World::step` de `server/acceptance/src/steps.rs`. Par exemple, pour
+`Then l’état annoncé est <etat>`, le gestionnaire reconnaît le préfixe
+`l’état annoncé est ` avec `parameter`, lit la colonne capturée avec
+`example_value` et compare cette valeur au champ JSON `status` de la réponse
+HTTP. Couvrez l’étape avec un exemple qui passe et un exemple qui échoue.

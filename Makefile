@@ -7,8 +7,8 @@ dev:
 	bash scripts/dev.sh
 
 lint:
-	cargo fmt --manifest-path server/Cargo.toml --check
-	cargo clippy --manifest-path server/Cargo.toml --locked --all-targets -- -D warnings
+	cargo fmt --manifest-path server/Cargo.toml --all --check
+	cargo clippy --manifest-path server/Cargo.toml --locked --workspace --all-targets -- -D warnings
 	npm --prefix web run lint
 
 build:
@@ -16,7 +16,7 @@ build:
 	cargo build --manifest-path server/Cargo.toml --locked --release
 
 test: web/node_modules/.installed
-	cargo test --manifest-path server/Cargo.toml --locked
+	cargo test --manifest-path server/Cargo.toml --locked --workspace
 	npm --prefix web test
 
 check: lint build test
