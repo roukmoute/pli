@@ -98,6 +98,8 @@ Les listes de fils sont disponibles sur `GET /api/v1/views/reception`, `/api/v1/
 
 ### Parcourir la boîte dans le navigateur
 
+La recette manuelle compare l’import des en-têtes, la lecture des corps et le nombre de non-lus sur une boîte distante et sur le banc local. [Résultats et commande de lecture seule](recette/infomaniak-lecture.md)
+
 La session ouvre Réception. Le menu permet de rejoindre Flux, Justificatifs ou un dossier du compte. La touche H ouvre le menu et Échap rend le focus à son bouton. Le champ de recherche du menu reconnaît les noms accentués. Chaque vue garde sa dernière page en mémoire pendant la session, avec le fil au focus, la section et l’ancre de défilement. Au retour, SolidJS affiche cette page pendant qu’une requête actualise son contenu. Les URL peuvent être rechargées directement, y compris `/dossier/{id}`.
 
 Le scénario de navigation dans `scripts/acceptation.sh` ouvre Chromium avec deux boîtes GreenMail fictives. Le banc utilise le navigateur de Playwright ou un Chromium système et installe celui de Playwright si nécessaire. `PLI_CHROMIUM_BIN` permet de choisir un exécutable. Pour conserver les captures de Réception, du menu et de la boîte vide aux trois formats, définissez `PLI_CAPTURES_NAVIGATION` avec le chemin absolu du dossier souhaité. Ajoutez `PLI_MESURE_RETOUR=1` pour chronométrer 100 retours sur ordinateur après 10 tours d’échauffement. Le fichier `mesure-retour.json` accompagne alors les captures.
