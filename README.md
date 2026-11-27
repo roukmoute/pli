@@ -26,6 +26,12 @@ Ces commandes installent les dépendances front avec `npm ci` au premier lanceme
 
 Dans un second terminal, `curl -s http://127.0.0.1:8080/api/v1/health` renvoie `{"status":"ok"}` si la lecture SQLite réussit.
 
+## Intégration continue
+
+À chaque push et à chaque pull request, le job `check` lance `make lint`, `make build` puis `make test` sur Ubuntu avec les versions de Rust et de Node du dépôt. Il fonctionne sans secret de messagerie.
+
+Les cartes consacrées aux tests d’intégration avec Docker et aux tests de bout en bout ajouteront leurs jobs au [même workflow CI](.github/workflows/ci.yml).
+
 ## Écrire et lancer un test
 
 **Rust.** Ajoutez un `#[test]` au module `tests` du fichier concerné. Pour tester une route, utilisez `#[tokio::test]`. L’instance créée par `let app = crate::test_support::TestApp::new()?;` conserve la base SQLite temporaire migrée, accessible par `app.db`, pendant toute sa portée. Importez `tower::ServiceExt` pour appeler le routeur en mémoire avec `app.router().oneshot(request).await?`. [Exemple de test HTTP](server/src/http.rs)
