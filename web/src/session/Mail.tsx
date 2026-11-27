@@ -1,6 +1,6 @@
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
-import { Avatar } from "../components/Avatar";
 import { Bouton } from "../components/Bouton";
+import Courrier from "../courrier/Courrier";
 import {
   ApiError,
   fermerSession,
@@ -99,67 +99,62 @@ export default function Mail() {
   };
   const activeSession = () => {
     const p = page();
-    return p.kind === "inbox" && p.session;
+    return p.kind === "inbox" ? p.session : undefined;
   };
   return (
-    <main class={styles.page}>
-      <section class={styles.card}>
-        <header class={styles.header}>
-          <span class={styles.brand}>Pli</span>
-          <label class={styles.language}>
-            {text().language}
-            <select
-              value={language()}
-              onChange={(e) => {
-                const value = e.currentTarget.value === "en" ? "en" : "fr";
-                document.documentElement.lang = value;
-                setLanguage(value);
-              }}
-            >
-              <option value="fr" lang="fr">
-                Français
-              </option>
-              <option value="en" lang="en">
-                English
-              </option>
-            </select>
-          </label>
-        </header>
-        <Switch fallback={<p role="status">{text().loading}</p>}>
-          <Match when={loginPage()} keyed>
-            {(p) => <Login text={text()} expired={p.expired} onOpen={inbox} />}
-          </Match>
-          <Match when={activeSession()} keyed>
-            {(session) => (
-              <>
-                <h1>{text().inbox}</h1>
-                <p class={styles.address}>
-                  <span aria-hidden="true">
-                    <Avatar nom={session.address} />
-                  </span>
-                  {session.address}
-                </p>
-                <p>{text().senders}</p>
-                <Bouton
-                  type="button"
-                  onClick={(e) => void close(e.currentTarget)}
+    <Show
+      when={activeSession()?.account_id}
+      keyed
+      fallback={
+        <main class={styles.page}>
+          <section class={styles.card}>
+            <header class={styles.header}>
+              <span class={styles.brand}>Pli</span>
+              <label class={styles.language}>
+                {text().language}
+                <select
+                  value={language()}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value === "en" ? "en" : "fr";
+                    document.documentElement.lang = value;
+                    setLanguage(value);
+                  }}
                 >
-                  {text().close}
+                  <option value="fr" lang="fr">
+                    Français
+                  </option>
+                  <option value="en" lang="en">
+                    English
+                  </option>
+                </select>
+              </label>
+            </header>
+            <Switch fallback={<p role="status">{text().loading}</p>}>
+              <Match when={loginPage()} keyed>
+                {(p) => (
+                  <Login text={text()} expired={p.expired} onOpen={inbox} />
+                )}
+              </Match>
+              <Match when={page().kind === "offline"}>
+                <p role="alert">{text().offline}</p>
+                <Bouton type="button" onClick={() => void restore()}>
+                  {text().retry}
                 </Bouton>
-                <Show when={closeFailed()}>
-                  <p role="alert">{text().offline}</p>
-                </Show>
-              </>
-            )}
-          </Match>
-          <Match when={page().kind === "offline"}>
-            <p role="alert">{text().offline}</p>
-            <Bouton type="button" onClick={() => void restore()}>
-              {text().retry}
-            </Bouton>
-          </Match>
-        </Switch>
-      </section>
-    </main>
+              </Match>
+            </Switch>
+          </section>
+        </main>
+      }
+    >
+      {(compte) => (
+        <Courrier
+          compte={compte}
+          adresse={activeSession()?.address ?? ""}
+          textes={text()}
+          fermer={close}
+          echec={Boolean(closeFailed())}
+        />
+      )}
+    </Show>
   );
 }

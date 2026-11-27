@@ -1,4 +1,10 @@
 const traces = {
+  reception: "M3 13l3-8h12l3 8v6H3Zm0 0h5l2 3h4l2-3h5",
+  flux: "M4 18c1.1 0 2 .9 2 2M4 12c4.4 0 8 3.6 8 8M4 5c8.3 0 15 6.7 15 15",
+  justificatifs: "M6 3h12v18l-3-2-3 2-3-2-3 2Zm3 5h6m-6 4h6",
+  plusTard: "M21 12a9 9 0 1 1-18 0 9 9 0 1 1 18 0Zm-9-5v5l4 2",
+  deCote: "M6 4h12v17l-6-4-6 4Z",
+  fermer: "m6 6 12 12M18 6 6 18",
   menu: "M3 6h18M3 12h14M3 18h18",
   recherche: "M16.5 10a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0ZM15 15l6 6",
   ecrire: "M4 16l-1 5 5-1L20 8l-4-4ZM13.5 6.5l4 4",

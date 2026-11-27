@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, path::PathBuf, sync::Arc};
 
 use axum::{
     Json, Router,
@@ -47,10 +47,23 @@ pub fn router(
             HeaderValue::from_static("no-store"),
         ))
         .with_state(db);
-    let files = Router::new()
-        .route_service("/admin", ServeFile::new("web/dist/index.html"))
-        .route_service("/admin/", ServeFile::new("web/dist/index.html"))
-        .fallback_service(ServeDir::new("web/dist"))
+    let root = std::env::var_os("WEBMAIL_WEB_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("web/dist"));
+    let mut files = Router::new();
+    for path in [
+        "/admin",
+        "/admin/",
+        "/reception",
+        "/flux",
+        "/justificatifs",
+        "/dossier/{id}",
+        "/ecrire",
+    ] {
+        files = files.route_service(path, ServeFile::new(root.join("index.html")));
+    }
+    let files = files
+        .fallback_service(ServeDir::new(root))
         .layer(middleware::from_fn(cache_static));
     Ok(Router::new().nest("/api", api).fallback_service(files))
 }

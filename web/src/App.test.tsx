@@ -19,7 +19,21 @@ function mount(initial: Response | Promise<Response>) {
   const fetchMock = vi
     .fn<typeof fetch>()
     .mockReturnValueOnce(Promise.resolve(initial));
-  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("fetch", (url: RequestInfo | URL, init?: RequestInit) => {
+    if (url === "/api/v1/views/reception")
+      return Promise.resolve(
+        Response.json({
+          compte: 3,
+          couverture: { import_en_cours: false, proportion_indexee: 1 },
+          vue: "reception",
+          revision: 0,
+          nouveaux: [],
+          deja_vus: [],
+          expediteurs_en_attente: 0,
+        }),
+      );
+    return fetchMock(url, init);
+  });
   const view = render(() => <App />);
   return { view, fetchMock };
 }
@@ -83,6 +97,7 @@ it("garde l’adresse, replace le focus et envoie une seule demande par soumissi
   await view.findByRole("heading", { name: "Réception" });
   expect(view.queryByRole("alert")).toBeNull();
   view.getByText(address);
+  fireEvent.click(view.getByLabelText(address, { selector: "summary" }));
   fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
   fireEvent.click(view.getByRole("button", { name: "Se déconnecter" }));
   await view.findByRole("heading", { name: "Connexion" });
@@ -162,6 +177,7 @@ it("permet de réessayer après une lecture ou une fermeture indisponible", asyn
   const retry = await view.findByRole("button", { name: "Réessayer" });
   fetchMock.mockResolvedValueOnce(Response.json(session()));
   fireEvent.click(retry);
+  fireEvent.click(await view.findByLabelText(address, { selector: "summary" }));
   const close = (await view.findByRole("button", {
     name: "Se déconnecter",
   })) as HTMLButtonElement;
