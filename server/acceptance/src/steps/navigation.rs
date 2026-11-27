@@ -1,17 +1,27 @@
 use super::{Example, Problem, World, example_value, expect, parameter};
-use serde::Deserialize;
+use serde::{Deserialize, de::DeserializeOwned};
 use std::net::SocketAddr;
 use tokio::process::Command;
 
 const SCRIPT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/navigation.mjs");
 
-fn commande_navigation(adresse: SocketAddr) -> Command {
+pub(super) fn commande_navigation(script: &str, adresse: SocketAddr) -> Command {
     let mut commande = Command::new("node");
     commande
-        .arg(SCRIPT)
+        .arg(script)
         .arg(format!("http://{adresse}"))
         .kill_on_drop(true);
     commande
+}
+
+pub(super) async fn observer<T: DeserializeOwned>(commande: &mut Command) -> Result<T, Problem> {
+    let sortie = commande.output().await.map_err(Problem::infra)?;
+    if !sortie.status.success() {
+        return Err(Problem::Step(
+            String::from_utf8_lossy(&sortie.stderr).into_owned(),
+        ));
+    }
+    serde_json::from_slice(&sortie.stdout).map_err(Problem::infra)
 }
 
 #[derive(Deserialize)]
@@ -28,16 +38,7 @@ impl World {
         row: &Example,
     ) -> Result<bool, Problem> {
         if text == "je parcours le menu et reviens en Réception dans le navigateur" {
-            let sortie = commande_navigation(self.address)
-                .output()
-                .await
-                .map_err(Problem::infra)?;
-            if !sortie.status.success() {
-                return Err(Problem::Step(
-                    String::from_utf8_lossy(&sortie.stderr).into_owned(),
-                ));
-            }
-            self.navigation = Some(serde_json::from_slice(&sortie.stdout).map_err(Problem::infra)?);
+            self.navigation = Some(observer(&mut commande_navigation(SCRIPT, self.address)).await?);
             return Ok(true);
         }
         let Some(nav) = &self.navigation else {
@@ -66,7 +67,7 @@ mod tests {
     use super::*;
     #[test]
     fn interrompt_la_sonde_avec_le_scenario() {
-        let commande = commande_navigation("127.0.0.1:1234".parse().unwrap());
+        let commande = commande_navigation(SCRIPT, "127.0.0.1:1234".parse().unwrap());
         assert!(commande.get_kill_on_drop());
     }
     #[tokio::test]

@@ -4,6 +4,7 @@ use reqwest::{Client, RequestBuilder, StatusCode};
 use serde_json::Value;
 
 use crate::{Error, Example};
+mod decisions;
 mod folders;
 mod navigation;
 mod pages;
@@ -39,6 +40,7 @@ pub(crate) struct World {
     initial_marker: Option<(u32, u32)>,
     page_precedente: Vec<String>,
     navigation: Option<navigation::Navigation>,
+    decisions: Option<decisions::Observations>,
     screener_bench: Option<screener::Bench>,
     pub(crate) recordings: Option<(PathBuf, PathBuf)>,
 }
@@ -59,6 +61,7 @@ impl World {
             initial_marker: None,
             page_precedente: Vec::new(),
             navigation: None,
+            decisions: None,
             screener_bench: None,
             recordings: None,
         })
@@ -106,6 +109,7 @@ impl World {
             && !self.screener_step(text, example).await?
             && !self.page_step(text, example).await?
             && !self.navigation_step(text, example).await?
+            && !self.decisions_step(text, example).await?
         {
             self.profile_step(text, example).await?;
         }

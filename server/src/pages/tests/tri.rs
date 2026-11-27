@@ -69,7 +69,9 @@ async fn classe_ancien_et_nouveau_courrier_puis_retablit_un_refus_apres_redemarr
     assert!(entree["suivant"].is_null());
     assert_eq!(entree["apercus"].as_array().unwrap().len(), 2);
     assert_eq!(entree["apercus"][0]["id"], "nouveau");
-    assert_eq!(entree["apercus"][0]["expediteur"]["adresse"], ADRESSE);
+    for fil in entree["apercus"].as_array().unwrap() {
+        assert_eq!(fil["expediteur"]["adresse"], ADRESSE);
+    }
     assert_eq!(entree["apercus"][1]["non_lu"], false);
     assert_eq!(lire(&route, HISTORIQUE).await?["expediteurs"], json!([]));
     let mut revision_compte = attente["revision"].as_i64().unwrap();
@@ -178,14 +180,17 @@ async fn arbitre_deux_onglets_sur_la_revision_de_l_adresse_et_protege_chaque_com
     for p in [ATTENTE, HISTORIQUE, MESSAGES] {
         assert_eq!(reponse(&route, p, None).await?.0, StatusCode::UNAUTHORIZED);
     }
+    let revision_courante = ok.1["decision"]["revision"].as_i64().unwrap();
     assert_eq!(
-        poster(&route, None, choisir("accepte", "flux", 1)).await?.0,
+        poster(&route, None, choisir("accepte", "flux", revision_courante))
+            .await?
+            .0,
         StatusCode::UNAUTHORIZED
     );
     for mauvaise in [
         choisir("accepte", "flux", 0),
-        choisir("autre", "flux", 1),
-        choisir("accepte", "indesirables", 1),
+        choisir("autre", "flux", revision_courante),
+        choisir("accepte", "indesirables", revision_courante),
         json!({}),
     ] {
         assert_eq!(

@@ -1,41 +1,9 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { connecter, ouvrirNavigateur, preparer, tailles } from "./navigateur.mjs";
 
-const requireWeb = createRequire(
-  new URL("../web/package.json", import.meta.url),
-);
-const { chromium } = requireWeb("playwright-core");
-const tailles = [
-  { width: 390, height: 844 },
-  { width: 768, height: 1024 },
-  { width: 1440, height: 900 },
-];
 const captures = process.env.PLI_CAPTURES_NAVIGATION;
-
-function executable() {
-  const personnalise = process.env.PLI_CHROMIUM_BIN;
-  if (personnalise) return personnalise;
-  return [
-    chromium.executablePath(),
-    "/usr/bin/chromium",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser",
-  ].find(existsSync);
-}
-
-function preparer() {
-  if (executable()) return;
-  const cli = join(
-    dirname(requireWeb.resolve("playwright-core/package.json")),
-    "cli.js",
-  );
-  execFileSync(process.execPath, [cli, "install", "chromium"], {
-    stdio: "inherit",
-  });
-}
 
 async function capture(page, etat, taille) {
   if (!captures) return;
@@ -43,14 +11,6 @@ async function capture(page, etat, taille) {
   await page.screenshot({
     path: join(captures, `${taille.width}-${etat}.png`),
   });
-}
-
-async function connecter(page, base, nom) {
-  await page.goto(new URL("/reception", base).href);
-  await page.getByLabel("Adresse de messagerie").fill(`${nom}@recette.test`);
-  await page.getByLabel("Secret de messagerie").fill(`${nom}-test`);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await page.getByRole("heading", { name: "Réception", exact: true }).waitFor();
 }
 
 async function verifier(page, taille) {
@@ -167,14 +127,11 @@ async function verifierRetour(page, avant, commande) {
 }
 
 async function parcourir(base) {
-  const browser = await chromium.launch({
-    executablePath: executable(),
-    headless: true,
-  });
+  const browser = await ouvrirNavigateur();
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(5500);
-    await connecter(page, base, "alice");
+    await connecter(page, base, "alice@recette.test", "alice-test");
     let retours = 0;
     for (const taille of tailles) {
       await verifier(page, taille);
@@ -183,7 +140,7 @@ async function parcourir(base) {
     if (process.env.PLI_MESURE_RETOUR === "1") await mesurerRetours(page);
     const vide = await browser.newPage();
     vide.setDefaultTimeout(5500);
-    await connecter(vide, base, "bob");
+    await connecter(vide, base, "bob@recette.test", "bob-test");
     const tri = vide.getByRole("button", { name: /Nouveaux expéditeurs/ });
     const compteurVide = Number(await tri.locator("strong").innerText());
     for (const taille of tailles) {

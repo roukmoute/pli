@@ -16,7 +16,7 @@ const WAIT: Duration = Duration::from_secs(12);
 pub(super) struct Bench {
     _relay: Child,
     events: Lines<BufReader<ChildStdout>>,
-    address: String,
+    pub(super) address: String,
 }
 
 impl Bench {
