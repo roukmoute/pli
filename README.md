@@ -93,6 +93,21 @@ Lorsque le serveur annonce `SPECIAL-USE`, ses attributs déterminent les rôles 
 
 Le synchroniseur importe jusqu’à 50 en-têtes par lot, en commençant par les UID les plus récents. Pendant l’import, une seconde connexion vérifie INBOX toutes les cinq secondes. Le serveur conserve un extrait de la partie textuelle et lit les dossiers en lecture seule.
 
+Les listes de fils sont disponibles sur `GET /api/v1/views/reception`, `/api/v1/views/flux`, `/api/v1/views/justificatifs` et `GET /api/v1/folders/{id}/messages`. Le paramètre `taille` accepte de 1 à 100 fils et vaut 20 par défaut. Pour continuer, transmettez `curseur_suivant` dans le paramètre `curseur` de la même liste. Une fin de liste renvoie `null`. La date de réception et l’identifiant stable du fil déterminent l’ordre entre les pages.
+
+`nouveaux` contient les fils avec au moins une lettre admise non lue. `deja_vus` contient les autres fils. Chaque résumé donne l’expéditeur, l’objet et l’extrait de sa dernière lettre visible, puis les indicateurs et le nombre de lettres du fil. `compteurs` compte les fils de chaque destination. `expediteurs_en_attente` compte les adresses distinctes à trier. La réponse fournit la révision de cette photographie SQLite. Les lectures HTTP utilisent l’index local pendant que le synchroniseur traite les prochains lots IMAP.
+
+`couverture` décrit l’import du dossier consulté, ou d’INBOX pour les trois vues. Avant le décompte IMAP, `attendus` et `proportion_indexee` valent `null`. Après ce décompte, `indexes` et `attendus` comptent des lettres et `proportion_indexee` va de 0 à 1. Un dossier vide déjà vérifié a une couverture de 1.
+
+### Mesurer une page au milieu de 100 000 messages
+
+```sh
+cargo build --manifest-path server/Cargo.toml --locked --release
+python3 bench/pages.py server/target/release/webmail-server
+```
+
+Le banc requiert Python 3 avec SQLite. Il démarre le serveur sur un port de bouclage et crée 100 000 lettres fictives réparties en 50 000 fils. Il suit les curseurs HTTP jusqu’au milieu de la boîte, chauffe la page de 50 fils puis chronomètre 100 requêtes sur une connexion persistante, jusqu’au décodage du JSON. Il vérifie les identifiants reçus et échoue à partir de 5 ms au p95. Sur le poste de développement le 27 novembre 2026, la médiane était de 0,295 ms et le p95 de 0,584 ms pour 14 207 octets par réponse.
+
 `GET /api/v1/screener` renvoie le tableau `senders` pour la session ouverte. Chaque entrée regroupe les nouvelles lettres d’une adresse en attente et contient `address`, `name`, `last_subject`, `snippet`, `message_count` et `revision`. Les lettres d’INBOX antérieures au repère restent en Réception, même si la même adresse écrit à nouveau et attend une décision.
 
 Le cookie est propre à l’hôte, `Secure`, `HttpOnly` et `SameSite=Strict`. Servez Pli en HTTPS en déploiement et utilisez l’adresse de bouclage en développement. SQLite conserve l’empreinte SHA-256 du jeton et le secret IMAP chiffré en AES-256-GCM. Le chiffrement associe le secret à l’adresse et au profil serveur. Sauvegardez la clé séparément de la base pour pouvoir relire les secrets après restauration.
