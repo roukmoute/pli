@@ -46,6 +46,7 @@ impl Lecteur {
             reveil.notified().await;
             while self.tenter(compte).await.is_err() {
                 // Messagerie injoignable : nouvel essai au prochain réveil ou après le délai.
+                tracing::warn!(account_id = compte, "Opérations en attente à reprendre");
                 let _ = timeout(REPRISE, reveil.notified()).await;
             }
         }
