@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
-use super::deplacement::{Arrivee, archives, corbeille, ouvrable, ranger};
+use super::deplacement::{Arrivee, archives, corbeille, dupliquer, ouvrable, ranger};
 use crate::{
     Error,
     db::Database,
@@ -22,6 +22,8 @@ pub(super) enum Genre {
     Restaurer,
     SupprimerDefinitivement,
     ViderDossier,
+    Deplacer,
+    Copier,
 }
 
 impl Genre {
@@ -36,6 +38,8 @@ impl Genre {
             Self::Restaurer => "restaurer",
             Self::SupprimerDefinitivement => "supprimer_definitivement",
             Self::ViderDossier => "vider_dossier",
+            Self::Deplacer => "deplacer",
+            Self::Copier => "copier",
         }
     }
 }
@@ -47,7 +51,8 @@ pub(super) struct Demande {
     pub genre: Genre,
     pub vue: Option<String>,
     pub cibles: Vec<String>,
-    /// Dossier où restaurer les lettres dont l’origine est inconnue.
+    /// Dossier d’arrivée d’un déplacement ou d’une copie. Pour une restauration,
+    /// dossier des lettres dont l’origine est inconnue.
     pub destination: Option<i64>,
 }
 
@@ -57,6 +62,7 @@ pub(super) enum Empechement {
     Archives,
     Corbeille,
     Origine,
+    Destination,
 }
 
 #[derive(Serialize)]
@@ -170,6 +176,13 @@ fn arrivee(
             .ok_or(Empechement::Corbeille),
         // Repli choisi par l’utilisateur pour les lettres sans dossier d’origine.
         (Genre::Restaurer, Some(choix)) => Ok(ouvrable(tx, compte, choix)?),
+        // Le dossier choisi a pu disparaître depuis l’affichage du sélecteur.
+        (Genre::Deplacer | Genre::Copier, choix) => match choix {
+            Some(choix) => ouvrable(tx, compte, choix)?,
+            None => None,
+        }
+        .map(Some)
+        .ok_or(Empechement::Destination),
         _ => Ok(None),
     })
 }
@@ -219,9 +232,10 @@ pub(super) fn creer(
         [seq],
     )?;
     // Une lettre à déplacer ou à effacer quitte ses listes dès l’enregistrement.
+    // Une lettre copiée y reste.
     tx.execute(
         "UPDATE messages SET moving=1 FROM operations o JOIN operation_kinds k ON k.kind=o.kind
-         WHERE o.seq=?1 AND k.flag IS NULL AND messages.account_id=o.account_id
+         WHERE o.seq=?1 AND k.flag IS NULL AND NOT k.copies AND messages.account_id=o.account_id
            AND (messages.folder_id,messages.uidvalidity,messages.uid) IN
                (SELECT folder_id,uidvalidity,uid FROM operation_messages WHERE operation=o.seq)",
         [seq],
@@ -255,6 +269,8 @@ pub(crate) enum Action {
     },
     /// Sans arrivée quand le dossier prévu a disparu depuis l’enregistrement.
     Deplacement(Option<Arrivee>),
+    /// Ajoute les lettres au dossier d’arrivée sans les retirer du leur.
+    Copie(Option<Arrivee>),
     /// Efface les lettres pour de bon.
     Suppression,
 }
@@ -279,7 +295,7 @@ pub(crate) fn prochain(db: &Database, compte: i64) -> Result<Option<Lot>, Error>
     let premier = reader
         .query_row(
             "SELECT o.seq,m.folder_id,m.uidvalidity,f.remote_path,
-                    k.flag AS drapeau,k.expected AS valeur,k.expunges AS efface,
+                    k.flag AS drapeau,k.expected AS valeur,k.expunges AS efface,k.copies AS copie,
                     coalesce(m.destination,o.destination) AS prevue,
                     a.id AS arrivee,a.uidvalidity AS generation_arrivee,
                     a.remote_path AS chemin_arrivee
@@ -299,6 +315,7 @@ pub(crate) fn prochain(db: &Database, compte: i64) -> Result<Option<Lot>, Error>
                         valeur: r.get("valeur")?,
                     },
                     None if r.get("efface")? => Action::Suppression,
+                    None if r.get("copie")? => Action::Copie(Arrivee::lire(r)?),
                     None => Action::Deplacement(Arrivee::lire(r)?),
                 };
                 Ok(Lot {
@@ -464,6 +481,9 @@ pub(crate) fn conclure(db: &Database, compte: i64, lot: &Lot, depot: &Depot) -> 
                 ranger(&tx, compte, lot, uid, issue, arrivee.as_ref(), depot)?
             }
             (Action::Suppression, issue) => ranger(&tx, compte, lot, uid, issue, None, depot)?,
+            (Action::Copie(arrivee), _) => {
+                dupliquer(&tx, compte, lot, uid, arrivee.as_ref(), depot)?
+            }
         }
     }
     tx.execute(

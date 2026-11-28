@@ -163,6 +163,42 @@ async fn envoyer(
 }
 
 impl Depart {
+    /// Copie les lettres présentes vers `arrivee`. La commande réussit ou échoue
+    /// pour toutes : les lettres restent de toute façon dans leur dossier.
+    pub(crate) async fn copier(mut self, arrivee: &str) -> Result<Depot, Error> {
+        let mut copie = Copie::default();
+        let mut acceptee = false;
+        if !self.presentes.is_empty() {
+            let commande = format!("UID COPY {} {}", ensemble(&self.presentes), boite(arrivee)?);
+            let reponse = command(&mut self.session, &commande, |reponse| {
+                copie.relever(reponse);
+                Ok(())
+            })
+            .await;
+            acceptee = match reponse {
+                Ok(()) => true,
+                Err(refus) if refus.is::<Refus>() => false,
+                Err(panne) => return Err(panne),
+            };
+        }
+        let sorts = self
+            .presentes
+            .iter()
+            .map(|uid| {
+                let sort = if acceptee {
+                    Sort::Partie(copie.nouveaux.get(uid).copied())
+                } else {
+                    Sort::Restee
+                };
+                (*uid, sort)
+            })
+            .collect();
+        Ok(Depot::Deplace {
+            generation: copie.generation,
+            sorts,
+        })
+    }
+
     /// Déplace les lettres présentes vers `arrivee`, ou les efface faute d’arrivée,
     /// puis constate lesquelles sont parties.
     pub(crate) async fn transferer(mut self, arrivee: Option<&str>) -> Result<Depot, Error> {

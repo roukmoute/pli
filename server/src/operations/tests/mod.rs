@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 
 mod archivage;
 mod corbeille;
+mod deplacement;
 
 use super::stockage::{
     Action, Demande, Depot, Genre, Lot, comptes_en_attente, conclure, creer, lire, prochain,

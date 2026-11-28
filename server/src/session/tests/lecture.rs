@@ -1,5 +1,6 @@
 mod archivage;
 mod corbeille;
+mod deplacement;
 mod operations;
 
 use super::*;

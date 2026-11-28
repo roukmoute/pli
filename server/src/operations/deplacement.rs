@@ -134,3 +134,41 @@ pub(super) fn ranger(
     )?;
     Ok(())
 }
+
+/// Ajoute au dossier d’arrivée la copie d’une lettre, quand son UID y est connu.
+/// Sans lui, la copie apparaîtra avec l’import de ce dossier.
+pub(super) fn dupliquer(
+    tx: &Connection,
+    compte: i64,
+    lot: &Lot,
+    uid: u32,
+    arrivee: Option<&Arrivee>,
+    depot: &Depot,
+) -> rusqlite::Result<()> {
+    let Some(arrivee) = arrivee else {
+        return Ok(());
+    };
+    let Some(nouveau) = depot.rattachement(uid, arrivee.generation) else {
+        return Ok(());
+    };
+    tx.execute(
+        "INSERT INTO messages(account_id,folder_id,uidvalidity,uid,message_id,sender_address,
+             sender_name,recipients,subject,sent_at,received_at,flags,size,has_attachments,
+             snippet,thread_id,placed)
+         SELECT account_id,?5,?6,?7,message_id,sender_address,sender_name,recipients,subject,
+                sent_at,received_at,flags,size,has_attachments,snippet,thread_id,
+                (SELECT role IS 'inbox' FROM folders WHERE id=?5)
+         FROM messages WHERE (account_id,folder_id,uidvalidity,uid)=(?1,?2,?3,?4)
+         ON CONFLICT(account_id,folder_id,uidvalidity,uid) DO NOTHING",
+        params![
+            compte,
+            lot.dossier,
+            lot.generation,
+            uid,
+            arrivee.dossier,
+            arrivee.generation,
+            nouveau
+        ],
+    )?;
+    Ok(())
+}

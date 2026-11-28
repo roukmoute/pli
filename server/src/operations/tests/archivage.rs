@@ -68,8 +68,10 @@ pub(super) fn lettres(app: &TestApp, fil: &str) -> Result<Vec<(i64, u32, u32, bo
 
 pub(super) fn arrivee(lot: &Lot) -> Option<&str> {
     match &lot.action {
-        Action::Deplacement(arrivee) => arrivee.as_ref().map(|a| a.chemin.as_str()),
-        _ => panic!("Lot de déplacement attendu."),
+        Action::Deplacement(arrivee) | Action::Copie(arrivee) => {
+            arrivee.as_ref().map(|a| a.chemin.as_str())
+        }
+        _ => panic!("Lot de déplacement ou de copie attendu."),
     }
 }
 

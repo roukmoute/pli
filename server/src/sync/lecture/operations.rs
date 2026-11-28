@@ -83,8 +83,15 @@ impl Lecteur {
                     .await
             }
             Action::Suppression => self.deplacer(compte, lot, chemin, None).await,
+            Action::Copie(Some(arrivee)) => {
+                let depart = self.partir(compte, lot.generation, chemin, &lot.uids).await;
+                match depart {
+                    Ok(depart) => depart.copier(&arrivee.chemin).await,
+                    Err(erreur) => Err(erreur),
+                }
+            }
             // Le dossier d’arrivée a disparu : les lettres restent où elles sont.
-            Action::Deplacement(None) => Err(Refus.into()),
+            Action::Deplacement(None) | Action::Copie(None) => Err(Refus.into()),
         };
         match reponse {
             Ok(depot) => Ok(depot),

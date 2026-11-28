@@ -70,6 +70,10 @@ async fn creer(
                     "origine_inconnue",
                     "Le dossier d’origine de ce courrier est inconnu.",
                 ),
+                Empechement::Destination => (
+                    "destination_inconnue",
+                    "Ce dossier n’existe plus ou ne reçoit pas de courrier.",
+                ),
             };
             api_error(StatusCode::CONFLICT, code, message)
         })?;
