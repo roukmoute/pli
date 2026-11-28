@@ -262,8 +262,9 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                     (f) => f.id,
                   )}
                   selection={entree.selection}
-                  archives={props.courrier.archives}
-                  archivable={!props.courrier.archives.recoit(props.vue)}
+                  courrier={props.courrier}
+                  vue={props.vue}
+                  total={contenu().total}
                   enPartance={entree.enPartance()}
                   titre={titre}
                 />

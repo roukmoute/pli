@@ -1,5 +1,5 @@
-import { filsEnPartance } from "./archivage";
 import { creerArchives } from "./archives";
+import { type Partance, partances } from "./departs";
 import { conclureOperation, projeterAttentes } from "./effets";
 import { creerArrivees, creerSuite, integrer, relire } from "./fenetre";
 import { appliquerLecture, creerLectures } from "./lecture";
@@ -26,6 +26,8 @@ export interface Fil {
   piece_jointe: boolean;
   repondu: boolean;
   transfere: boolean;
+  /** Dans la Corbeille ou les Indésirables : le fil ne sait pas où revenir. */
+  sans_origine?: boolean;
   /** Posé par le navigateur tant que la messagerie n’a pas confirmé l’action. */
   attente?: { etoile?: boolean; lu?: boolean };
 }
@@ -36,6 +38,8 @@ export interface PageFils {
   dossier?: number;
   nouveaux: Fil[];
   deja_vus: Fil[];
+  /** Nombre de fils de la liste entière, pages non chargées comprises. */
+  total?: number;
   revision: number;
   expediteurs_en_attente: number;
   curseur_suivant: string | null;
@@ -70,9 +74,13 @@ export interface Repere {
 function nouvelleVue(
   compte: number,
   vue: Vue,
-  lancer: (type: TypeOperation, cibles: string[]) => Promise<string[]>,
+  lancer: (
+    type: TypeOperation,
+    cibles: string[],
+    destination?: number,
+  ) => Promise<string[]>,
   afficher: (base: Etat<PageFils>) => Etat<PageFils>,
-  enPartance: () => number,
+  enPartance: () => Partance[],
 ) {
   const repere: Repere = {
     defilement: 0,
@@ -175,11 +183,12 @@ export function creerCourrier(compte: number, lectureEnSerie = false) {
       entree = nouvelleVue(
         compte,
         vue,
-        (type, cibles) => operations.lancer({ type, vue, cibles }),
+        (type, cibles, destination) =>
+          operations.lancer({ type, vue, cibles, destination }),
         // Les actions en attente se superposent à la page servie.
         (etat) =>
           projeterAttentes(afficher(vue, etat), vue, operations.enAttente()),
-        () => filsEnPartance(operations.enAttente(), vue),
+        () => partances(operations.enAttente(), vue),
       );
       vues.set(vue, entree);
     }

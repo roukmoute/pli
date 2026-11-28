@@ -1,6 +1,12 @@
 import { expect, it, vi } from "vitest";
 import { fil, ids, page } from "../../tests/fils";
-import { conclureArchivage, filsEnPartance, retirerFils } from "./archivage";
+import {
+  conclureDepart,
+  conclureVidage,
+  partances,
+  retirerFils,
+  viderVue,
+} from "./departs";
 import type { EnAttente, TypeOperation } from "./operations";
 import type { PageFils } from "./vues";
 
@@ -27,21 +33,51 @@ it("retire les fils archivés de la seule vue où le geste a eu lieu", () => {
   expect(allegee.nouveaux[0]).toBe(c);
   expect(allegee.deja_vus[0]).toBe(d);
   expect(allegee.revision).toBe(reception.revision);
+  // Sans total servi, rien n’est inventé. Avec lui, il suit les départs.
+  expect(allegee.total).toBeUndefined();
+  const comptee = { ...reception, total: 9 };
+  expect(retirerFils(comptee, "reception", archiver).total).toBe(7);
   expect(retirerFils(reception, "flux", archiver)).toBe(reception);
   const ailleurs = operation("archiver", "reception", "absent");
   expect(retirerFils(reception, "reception", ailleurs)).toBe(reception);
 });
 
-it("compte les fils en partance de la vue", () => {
+it("compte par type les départs en attente de la vue", () => {
   const attentes = [
     operation("archiver", "reception", "a", "b"),
     operation("lu", "reception", "c"),
     operation("archiver", "flux", "d"),
-    operation("archiver", "reception", "e"),
+    operation("corbeille", "reception", "e"),
+    operation("archiver", "reception", "f"),
+    operation("vider_dossier", "dossier/8", "dossier/8"),
   ];
-  expect(filsEnPartance(attentes, "reception")).toBe(3);
-  expect(filsEnPartance(attentes, "flux")).toBe(1);
-  expect(filsEnPartance(attentes, "justificatifs")).toBe(0);
+  expect(partances(attentes, "reception")).toEqual([
+    { type: "archiver", nombre: 3 },
+    { type: "corbeille", nombre: 1 },
+  ]);
+  expect(partances(attentes, "flux")).toEqual([
+    { type: "archiver", nombre: 1 },
+  ]);
+  expect(partances(attentes, "dossier/8")).toEqual([
+    { type: "vider_dossier", nombre: 1 },
+  ]);
+  expect(partances(attentes, "justificatifs")).toEqual([]);
+});
+
+it("vide la liste du seul dossier visé", () => {
+  const corbeille = { ...page([a, b]), curseur_suivant: "suite" };
+  const vider = operation("vider_dossier", "dossier/8", "dossier/8");
+  expect(viderVue(corbeille, "dossier/8", vider)).toEqual({
+    ...corbeille,
+    nouveaux: [],
+    deja_vus: [],
+    curseur_suivant: null,
+    total: 0,
+  });
+  expect(viderVue(corbeille, "dossier/9", vider)).toBe(corbeille);
+  // Un vidage refusé ne désigne plus aucune cible : la liste reste entière.
+  const refuse = operation("vider_dossier", "dossier/8");
+  expect(viderVue(corbeille, "dossier/8", refuse)).toBe(corbeille);
 });
 
 function cache(valeur?: PageFils) {
@@ -73,7 +109,7 @@ it("retire du cache les fils confirmés puis relit les vues touchées et les dos
   };
   const lectures = { actualiserFils: vi.fn(async () => {}) };
   const archiver = operation("archiver", "reception", "a", "b");
-  await conclureArchivage(Object.entries(vues), lectures, archiver, ["a"], 3);
+  await conclureDepart(Object.entries(vues), lectures, archiver, ["a"], 3);
   // Le fil b, refusé, reste en cache : la liste le montre de nouveau.
   expect(ids(vues.reception.source.courante as PageFils)).toEqual({
     nouveaux: ["c"],
@@ -97,11 +133,32 @@ it("ne réécrit pas une page relue depuis l’écriture et relit la vue du gest
   const vues = { reception: cache(sansCible), flux: cache(page([a])) };
   const lectures = { actualiserFils: vi.fn(async () => {}) };
   const archiver = operation("archiver", "flux", "a");
-  await conclureArchivage(Object.entries(vues), lectures, archiver, ["a"], 2);
+  await conclureDepart(Object.entries(vues), lectures, archiver, ["a"], 2);
   expect(vues.flux.source.courante).toEqual(page([a]));
   expect(relues(vues)).toEqual(["flux"]);
   const partie = operation("archiver", "reception", "a");
-  await conclureArchivage(Object.entries(vues), lectures, partie, ["a"], 3);
+  await conclureDepart(Object.entries(vues), lectures, partie, ["a"], 3);
   expect(vues.reception.source.courante).toBe(sansCible);
   expect(vues.reception.source.recharger).toHaveBeenCalledTimes(1);
+});
+
+it("vide le cache du dossier quand la messagerie a confirmé son vidage", async () => {
+  const vues = {
+    "dossier/8": cache(page([a, b])),
+    reception: cache(reception),
+  };
+  const lectures = { actualiserFils: vi.fn(async () => {}) };
+  const vider = operation("vider_dossier", "dossier/8", "dossier/8");
+  await conclureVidage(Object.entries(vues), lectures, vider, [], 3);
+  expect(ids(vues["dossier/8"].source.courante as PageFils)).toEqual({
+    nouveaux: ["a"],
+    deja_vus: ["b"],
+  });
+  await conclureVidage(Object.entries(vues), lectures, vider, ["dossier/8"], 3);
+  expect(ids(vues["dossier/8"].source.courante as PageFils)).toEqual({
+    nouveaux: [],
+    deja_vus: [],
+  });
+  expect(vues.reception.source.courante).toBe(reception);
+  expect(relues(vues)).toEqual(["dossier/8"]);
 });

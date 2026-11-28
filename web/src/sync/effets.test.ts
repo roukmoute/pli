@@ -68,4 +68,27 @@ it("conclut chaque opération selon son type", async () => {
   });
   expect(ids(await conclure("non_lu"))).toEqual(ids(reception));
   expect((await conclure("sans_etoile")).nouveaux[0]).toEqual(a);
+  // Jeter, restaurer ou effacer retire aussi les seuls fils confirmés.
+  for (const type of [
+    "corbeille",
+    "restaurer",
+    "supprimer_definitivement",
+  ] as const)
+    expect(ids(await conclure(type))).toEqual({
+      nouveaux: ["c"],
+      deja_vus: ["b"],
+    });
+  expect(ids(await conclure("vider_dossier"))).toEqual({
+    nouveaux: [],
+    deja_vus: [],
+  });
+});
+
+it("vide la liste dès la demande de vidage", () => {
+  const pret = { statut: "pret", valeur: reception, perime: false } as const;
+  const projete = projeterAttentes(pret, "reception", [
+    operation("vider_dossier", "reception"),
+  ]);
+  const affichee = projete.statut === "pret" ? projete.valeur : reception;
+  expect(ids(affichee)).toEqual({ nouveaux: [], deja_vus: [] });
 });

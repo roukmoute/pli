@@ -69,14 +69,16 @@ it("additionne les refus des actions lancées depuis le dernier geste", async ()
 
 it("retire les fils archivés de la sélection et n’y ramène que les fils refusés", async () => {
   const retenue = reponseRetenue<string[]>();
-  const lancer = vi.fn(() => retenue.promise);
+  const lancer = vi.fn(
+    (_type: string, _ids: string[], _dossier?: number) => retenue.promise,
+  );
   const choix = creerSelection(lancer);
   choix.cocher(["a", "b", "c"], true);
   flush();
-  await choix.archiver([]);
+  await choix.partir("archiver", []);
   expect(lancer).not.toHaveBeenCalled();
-  const ecriture = choix.archiver(["a", "b", "d"]);
-  expect(lancer.mock.calls).toEqual([["archiver", ["a", "b", "d"]]]);
+  const ecriture = choix.partir("archiver", ["a", "b", "d"]);
+  expect(lancer.mock.calls).toEqual([["archiver", ["a", "b", "d"], undefined]]);
   expect(choisis(choix)).toEqual(["c"]);
   expect(echecs(choix)).toBe(0);
   retenue.resolve(["b", "d"]);
@@ -84,4 +86,41 @@ it("retire les fils archivés de la sélection et n’y ramène que les fils ref
   // Le fil d n’était pas coché : refusé, il est proposé à la reprise comme b.
   expect(choisis(choix)).toEqual(["c", "b", "d"]);
   expect(echecs(choix)).toBe(2);
+});
+
+it("transmet le dossier choisi pour une restauration sans origine", async () => {
+  const lancer = vi.fn(
+    async (_type: string, _ids: string[], _dossier?: number) => ["b"],
+  );
+  const choix = creerSelection(lancer);
+  await choix.partir("restaurer", ["a", "b"], 7);
+  expect(lancer.mock.calls).toEqual([["restaurer", ["a", "b"], 7]]);
+  expect(choisis(choix)).toEqual(["b"]);
+  expect(echecs(choix)).toBe(1);
+});
+
+it("annonce un vidage que la messagerie n’a pas entièrement confirmé", async () => {
+  const lancer = vi
+    .fn<(type: string, ids: string[]) => Promise<string[]>>()
+    .mockResolvedValue([])
+    .mockResolvedValueOnce(["a"])
+    .mockResolvedValueOnce(["dossier/8"]);
+  const choix = creerSelection(lancer);
+  const refus = () => {
+    flush();
+    return choix.vidageRefuse();
+  };
+  expect(refus()).toBe(false);
+  await choix.partir("corbeille", ["a"]);
+  expect(echecs(choix)).toBe(1);
+  // Un vidage efface l’annonce précédente, puis signale son propre refus.
+  await choix.vider("dossier/8");
+  expect(lancer.mock.calls[1]).toEqual(["vider_dossier", ["dossier/8"]]);
+  expect(echecs(choix)).toBe(0);
+  expect(refus()).toBe(true);
+  await choix.vider("dossier/8");
+  expect(refus()).toBe(false);
+  await choix.vider("dossier/8");
+  await choix.partir("corbeille", ["a"]);
+  expect(refus()).toBe(false);
 });

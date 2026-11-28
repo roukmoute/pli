@@ -22,7 +22,6 @@ afterEach(() => {
 it("lance l’action sans attendre quand les archives ont leur dossier", async () => {
   const { lecture, dossiers, choix } = ouvrir(async () => [inbox, archives]);
   expect(choix.echec()).toBe(false);
-  expect(choix.recoit("dossier/7")).toBe(false);
   expect(choix.candidats()).toEqual([]);
   choix.preparer();
   expect(lecture).toHaveBeenCalledTimes(1);
@@ -36,9 +35,6 @@ it("lance l’action sans attendre quand les archives ont leur dossier", async (
   expect(lecture).toHaveBeenCalledTimes(1);
   flush();
   expect(choix.demande()).toBeUndefined();
-  expect(choix.recoit("dossier/7")).toBe(true);
-  expect(choix.recoit("dossier/1")).toBe(false);
-  expect(choix.recoit("reception")).toBe(false);
 });
 
 it("charge le catalogue avant de décider et s’en remet au serveur s’il est illisible", async () => {
@@ -85,7 +81,6 @@ it("demande le dossier des archives, le retient puis lance l’action suspendue"
   expect(choix.echec()).toBe(false);
   expect(choix.demande()).toBeUndefined();
   expect(action).toHaveBeenCalledTimes(1);
-  expect(choix.recoit("dossier/2")).toBe(true);
   // Le choix est connu : le geste suivant ne demande plus rien.
   choix.avecDestination(action);
   expect(action).toHaveBeenCalledTimes(2);

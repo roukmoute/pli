@@ -28,6 +28,9 @@
   color: var(--commande);
   cursor: pointer;
 }
+.definitif {
+  margin-right: 0.5rem;
+}
 .choixDossier {
   width: 100%;
   text-align: start;

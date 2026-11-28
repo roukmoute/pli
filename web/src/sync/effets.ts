@@ -1,4 +1,9 @@
-import { conclureArchivage, retirerFils } from "./archivage";
+import {
+  conclureDepart,
+  conclureVidage,
+  retirerFils,
+  viderVue,
+} from "./departs";
 import { conclureIndicateur, projeterIndicateur } from "./indicateurs";
 import type { EnAttente, TypeOperation } from "./operations";
 import type { Etat } from "./ressource";
@@ -8,14 +13,19 @@ import type { PageFils } from "./vues";
 const drapeau = { projeter: projeterIndicateur, conclure: conclureIndicateur };
 const depart: typeof drapeau = {
   projeter: retirerFils,
-  conclure: conclureArchivage,
+  conclure: conclureDepart,
 };
+const vidage: typeof drapeau = { projeter: viderVue, conclure: conclureVidage };
 const effets: Record<TypeOperation, typeof drapeau> = {
   etoile: drapeau,
   sans_etoile: drapeau,
   lu: drapeau,
   non_lu: drapeau,
   archiver: depart,
+  corbeille: depart,
+  restaurer: depart,
+  supprimer_definitivement: depart,
+  vider_dossier: vidage,
 };
 
 /** Superpose à la page servie les actions que la messagerie n’a pas encore confirmées. */

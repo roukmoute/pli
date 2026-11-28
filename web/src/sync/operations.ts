@@ -6,7 +6,11 @@ export type TypeOperation =
   | "sans_etoile"
   | "lu"
   | "non_lu"
-  | "archiver";
+  | "archiver"
+  | "corbeille"
+  | "restaurer"
+  | "supprimer_definitivement"
+  | "vider_dossier";
 type EtatCible = "en_attente" | "confirme" | "partiel" | "refuse" | "absent";
 
 export interface Operation {
@@ -22,6 +26,8 @@ export interface Intention {
   type: TypeOperation;
   vue: string;
   cibles: string[];
+  /** Dossier où restaurer les lettres dont l’origine est inconnue. */
+  destination?: number;
 }
 
 /** Intention envoyée sous un identifiant stable, pas encore confirmée ni refusée. */

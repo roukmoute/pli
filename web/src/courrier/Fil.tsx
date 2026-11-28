@@ -4,10 +4,9 @@ import { Avatar } from "../components/Avatar";
 import { t } from "../i18n";
 import { Icone } from "../icons/Icone";
 import type { Courrier, Vue } from "../sync";
-import type { Archives } from "../sync/archives";
 import type { Entete, Lectures } from "../sync/lecture";
 import { avancer } from "../sync/serie";
-import { CommandeArchiver } from "./Archives";
+import { CommandesDepart } from "./Commandes";
 import layout from "./courrier.module.css";
 import styles from "./lecture.module.css";
 import { Message } from "./Message";
@@ -100,10 +99,11 @@ function Pile(props: {
   fil: string;
   id?: string;
   cache: Lectures;
-  archives: Archives;
-  /** Faux quand le fil a été ouvert depuis le dossier qui reçoit les archives. */
-  archivable: boolean;
-  archiver: () => void;
+  courrier: Courrier;
+  /** Vue d’où le fil a été ouvert : ses commandes y prennent leurs lettres. */
+  origine: Vue;
+  /** Après une commande qui retire le fil de sa liste. */
+  quitter: () => void;
 }) {
   const entree = props.cache.fil(props.fil);
   const conversation = () => {
@@ -162,18 +162,13 @@ function Pile(props: {
                 </button>
               )}
             </For>
-            <Show when={props.archivable}>
-              <CommandeArchiver
-                archives={props.archives}
-                lancer={props.archiver}
-                icone
-                libelle={t(
-                  courant().messages.length === 1
-                    ? "archiveMessage"
-                    : "archiveThread",
-                )}
-              />
-            </Show>
+            <CommandesDepart
+              courrier={props.courrier}
+              vue={props.origine}
+              cibles={() => [props.fil]}
+              portee={courant().messages.length === 1 ? "message" : "fil"}
+              apres={props.quitter}
+            />
           </div>
         </>
       )}
@@ -184,31 +179,27 @@ export default function EcranFil(props: { courrier: Courrier }) {
   const params = useParams<{ fil: string; id?: string }>();
   const lieu = useLocation<{ retour: string }>();
   const naviguer = useNavigate();
-  const archives = props.courrier.archives;
   // Chemin de la liste d’où le fil a été ouvert. Absent après une arrivée directe.
   const liste = () => lieu.state?.retour;
   function retour() {
     if (liste()) naviguer(-1);
     else naviguer("/reception", { replace: true });
   }
-  // L’archivage prend les lettres du fil dans cette vue.
+  // Les commandes prennent les lettres du fil dans cette vue.
   const origine = () => (liste() || "/reception").slice(1) as Vue;
-  function archiver(fil: string) {
-    const vue = origine();
-    archives.avecDestination(() => {
-      const entree = props.courrier.obtenirVue(vue);
-      void entree.selection.archiver([fil]);
-      // En lecture en série, le fil suivant s’ouvre. Sinon la liste reprend sur la ligne voisine.
-      const suivant = props.courrier.lectureEnSerie
-        ? avancer(entree, fil)
-        : undefined;
-      if (suivant)
-        naviguer(`/fil/${encodeURIComponent(suivant)}`, {
-          replace: true,
-          state: lieu.state,
-        });
-      else retour();
-    });
+  // Le fil a quitté sa liste. En lecture en série, le fil suivant s’ouvre.
+  // Sinon la liste reprend sur la ligne voisine.
+  function quitter(fil: string) {
+    const entree = props.courrier.obtenirVue(origine());
+    const suivant = props.courrier.lectureEnSerie
+      ? avancer(entree, fil)
+      : undefined;
+    if (suivant)
+      naviguer(`/fil/${encodeURIComponent(suivant)}`, {
+        replace: true,
+        state: lieu.state,
+      });
+    else retour();
   }
   return (
     <main class={layout.defilement}>
@@ -222,9 +213,9 @@ export default function EcranFil(props: { courrier: Courrier }) {
               fil={fil}
               id={params.id}
               cache={props.courrier.lectures}
-              archives={archives}
-              archivable={!archives.recoit(origine())}
-              archiver={() => archiver(fil)}
+              courrier={props.courrier}
+              origine={origine()}
+              quitter={() => quitter(fil)}
             />
           )}
         </Show>

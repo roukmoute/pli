@@ -46,5 +46,21 @@
     "role": null,
     "hidden": true,
     "selectable": true
+  },
+  "corbeille": {
+    "id": 8,
+    "path": "Papierkorb",
+    "delimiter": "/",
+    "role": "trash",
+    "hidden": false,
+    "selectable": true
+  },
+  "reclames": {
+    "id": 10,
+    "path": "Spam",
+    "delimiter": "/",
+    "role": "junk",
+    "hidden": false,
+    "selectable": true
   }
 }

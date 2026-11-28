@@ -44,14 +44,6 @@ export function creerArchives(dossiers: Catalogue, retenir = retenirArchives) {
       if (dossiers.valeur()) decider(action);
       else void dossiers.charger().then(() => decider(action));
     },
-    /** Vrai pour la vue du dossier qui reçoit les archives : rien n’y est à archiver. */
-    recoit(vue: string) {
-      const etat = dossiers.etat();
-      return (
-        etat.statut === "pret" &&
-        etat.valeur.some((d) => recoit(d) && `dossier/${d.id}` === vue)
-      );
-    },
     /** Dossiers personnels où l’on peut ranger du courrier. */
     candidats() {
       const etat = dossiers.etat();
