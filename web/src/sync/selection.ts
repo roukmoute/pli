@@ -17,7 +17,8 @@ export type Depart =
   | "archiver"
   | "corbeille"
   | "restaurer"
-  | "supprimer_definitivement";
+  | "supprimer_definitivement"
+  | "deplacer";
 
 export function creerSelection(lancer: Lancer) {
   const [choisis, choisir] = createSignal<ReadonlySet<string>>(new Set());
@@ -46,6 +47,7 @@ export function creerSelection(lancer: Lancer) {
       true,
     );
     signaler((nombre) => nombre + refuses.size);
+    return [...refuses];
   }
 
   async function marquer(
@@ -60,10 +62,19 @@ export function creerSelection(lancer: Lancer) {
     await executer(lot, () => lancer(typeOperation(indicateur, valeur), ids));
   }
 
-  /** Les fils partent avec leur coche. Seuls les fils refusés sont proposés à la reprise. */
+  /**
+   * Les fils partent avec leur coche. Seuls les fils refusés, rendus à l’appelant,
+   * sont proposés à la reprise.
+   */
   async function partir(type: Depart, ids: string[], dossier?: number) {
-    if (!ids.length) return;
-    await executer(ids, () => lancer(type, ids, dossier));
+    if (!ids.length) return [];
+    return executer(ids, () => lancer(type, ids, dossier));
+  }
+
+  /** Copie les fils vers le dossier. Ils restent dans leur liste, avec leur coche. */
+  async function copier(ids: string[], dossier: number) {
+    if (!ids.length) return [];
+    return executer([], () => lancer("copier", ids, dossier));
   }
 
   /** Vide le dossier affiché. Un refus, même partiel, est annoncé. */
@@ -73,6 +84,15 @@ export function creerSelection(lancer: Lancer) {
     const refuses = await lancer("vider_dossier", [dossier]);
     refuserVidage(refuses.length > 0);
   }
-  return { choisis, cocher, marquer, partir, vider, echecs, vidageRefuse };
+  return {
+    choisis,
+    cocher,
+    marquer,
+    partir,
+    copier,
+    vider,
+    echecs,
+    vidageRefuse,
+  };
 }
 export type Selection = ReturnType<typeof creerSelection>;

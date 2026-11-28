@@ -19,7 +19,6 @@ const actions = [
   ["reply", "repondre"],
   ["replyLater", "plusTard"],
   ["putAside", "deCote"],
-  ["more", "plus"],
 ] as const;
 function nom(m: Entete) {
   return m.nom || m.adresse || t("unknownSender");

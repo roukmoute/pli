@@ -1,10 +1,11 @@
 import type { JSX } from "@solidjs/web";
-import { createUniqueId, For, onSettled, Show } from "solid-js";
+import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { t } from "../i18n";
 import { Icone } from "../icons/Icone";
 import type { Dossier } from "../sync";
 import type { Archives } from "../sync/archives";
 import styles from "./courrier.module.css";
+import { normaliser } from "./texte";
 
 // Le catalogue des dossiers se charge dès que la commande s’affiche :
 // le geste d’archivage n’attendra pas le réseau.
@@ -74,43 +75,61 @@ export function Dialogue(props: {
 }
 
 // La boîte de réception porte son nom d’usage, les autres dossiers leur chemin.
-function nomDossier(dossier: Dossier) {
+export function nomDossier(dossier: Dossier) {
   return dossier.role === "inbox" ? t("inbox") : dossier.path;
 }
 
-/** Demande un dossier parmi ceux proposés. */
+/** Sélecteur de dossiers : ceux du compte ouvert, filtrables au clavier. */
 export function ChoixDossier(props: {
   titre: string;
   aide: string;
   /** Dit pourquoi aucun dossier n’est proposé. */
   vide: string;
   dossiers: Dossier[];
-  echec?: boolean;
+  /** Annonce, par exemple le refus du dossier choisi auparavant. */
+  alerte?: string | false;
   choisir: (dossier: number) => void;
   renoncer: () => void;
 }) {
+  const [filtre, filtrer] = createSignal("");
+  const retenus = () =>
+    props.dossiers.filter((dossier) =>
+      normaliser(nomDossier(dossier)).includes(normaliser(filtre())),
+    );
   return (
     <Dialogue titre={props.titre} renoncer={props.renoncer}>
       <p>{props.aide}</p>
-      <Show when={props.dossiers.length} fallback={<p>{props.vide}</p>}>
-        <ul>
-          <For each={props.dossiers} keyed={(d) => d.id}>
-            {(dossier) => (
-              <li>
-                <button
-                  type="button"
-                  class={styles.choixDossier}
-                  onClick={() => props.choisir(dossier().id)}
-                >
-                  {nomDossier(dossier())}
-                </button>
-              </li>
-            )}
-          </For>
-        </ul>
+      <Show when={props.alerte}>
+        <p role="alert">{props.alerte}</p>
       </Show>
-      <Show when={props.echec}>
-        <p role="alert">{t("archiveDestinationError")}</p>
+      <Show when={props.dossiers.length} fallback={<p>{props.vide}</p>}>
+        <input
+          type="search"
+          aria-label={t("destinationFilter")}
+          placeholder={t("destinationFilter")}
+          value={filtre()}
+          onInput={(e) => filtrer(e.currentTarget.value)}
+        />
+        <Show
+          when={retenus().length}
+          fallback={<p role="status">{t("destinationNone")}</p>}
+        >
+          <ul>
+            <For each={retenus()} keyed={(d) => d.id}>
+              {(dossier) => (
+                <li>
+                  <button
+                    type="button"
+                    class={styles.choixDossier}
+                    onClick={() => props.choisir(dossier().id)}
+                  >
+                    {nomDossier(dossier())}
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
       </Show>
     </Dialogue>
   );
@@ -127,7 +146,7 @@ export function ChoixArchives(props: {
       aide={t("archiveDestinationHelp")}
       vide={t("archiveNoFolder")}
       dossiers={props.archives.candidats()}
-      echec={props.archives.echec()}
+      alerte={props.archives.echec() && t("archiveDestinationError")}
       choisir={(dossier) => void props.archives.choisir(dossier, props.lancer)}
       renoncer={() => props.archives.renoncer()}
     />

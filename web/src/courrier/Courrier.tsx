@@ -15,6 +15,7 @@ import styles from "./courrier.module.css";
 import EcranFil from "./Fil";
 import { Liste } from "./Liste";
 import Menu from "./Menu";
+import { ChoixRangement } from "./Rangements";
 import EcranTri from "./Tri";
 
 interface Props {
@@ -139,6 +140,11 @@ function Barre(props: Props & { cache: CacheCourrier; children: JSX.Element }) {
       {props.children}
       <Show when={menu()}>
         <Menu courrier={props.cache} fermer={fermerMenu} />
+      </Show>
+      <Show when={props.cache.rangements.demande()}>
+        {(demande) => (
+          <ChoixRangement courrier={props.cache} demande={demande()} />
+        )}
       </Show>
       <Show when={props.cache.archives.demande()}>
         {(demande) => (

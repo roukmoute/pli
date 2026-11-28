@@ -1,6 +1,8 @@
 import {
+  conclureCopie,
   conclureDepart,
   conclureVidage,
+  laisser,
   retirerFils,
   viderVue,
 } from "./departs";
@@ -16,6 +18,7 @@ const depart: typeof drapeau = {
   conclure: conclureDepart,
 };
 const vidage: typeof drapeau = { projeter: viderVue, conclure: conclureVidage };
+const copie: typeof drapeau = { projeter: laisser, conclure: conclureCopie };
 const effets: Record<TypeOperation, typeof drapeau> = {
   etoile: drapeau,
   sans_etoile: drapeau,
@@ -26,6 +29,8 @@ const effets: Record<TypeOperation, typeof drapeau> = {
   restaurer: depart,
   supprimer_definitivement: depart,
   vider_dossier: vidage,
+  deplacer: depart,
+  copier: copie,
 };
 
 /** Superpose à la page servie les actions que la messagerie n’a pas encore confirmées. */

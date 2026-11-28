@@ -10,7 +10,9 @@ export type TypeOperation =
   | "corbeille"
   | "restaurer"
   | "supprimer_definitivement"
-  | "vider_dossier";
+  | "vider_dossier"
+  | "deplacer"
+  | "copier";
 type EtatCible = "en_attente" | "confirme" | "partiel" | "refuse" | "absent";
 
 export interface Operation {
@@ -26,7 +28,10 @@ export interface Intention {
   type: TypeOperation;
   vue: string;
   cibles: string[];
-  /** Dossier où restaurer les lettres dont l’origine est inconnue. */
+  /**
+   * Dossier d’arrivée d’un déplacement ou d’une copie. Pour une restauration,
+   * dossier des lettres dont l’origine est inconnue.
+   */
   destination?: number;
 }
 

@@ -4,6 +4,7 @@ import { t } from "../i18n";
 import { Icone, type NomIcone } from "../icons/Icone";
 import type { Courrier, Dossier } from "../sync";
 import styles from "./courrier.module.css";
+import { normaliser } from "./texte";
 
 interface Destination {
   titre: string;
@@ -44,14 +45,6 @@ function destinations(dossiers: Dossier[]): Destination[] {
         lien: `/dossier/${d.id}`,
       })),
   );
-}
-
-function normaliser(texte: string) {
-  return texte
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLocaleLowerCase("fr")
-    .trim();
 }
 
 export default function Menu(props: {

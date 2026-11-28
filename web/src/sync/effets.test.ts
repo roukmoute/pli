@@ -73,6 +73,7 @@ it("conclut chaque opération selon son type", async () => {
     "corbeille",
     "restaurer",
     "supprimer_definitivement",
+    "deplacer",
   ] as const)
     expect(ids(await conclure(type))).toEqual({
       nouveaux: ["c"],
@@ -82,13 +83,21 @@ it("conclut chaque opération selon son type", async () => {
     nouveaux: [],
     deja_vus: [],
   });
+  // Une copie laisse la liste intacte.
+  expect(await conclure("copier")).toBe(reception);
 });
 
-it("vide la liste dès la demande de vidage", () => {
+it("vide la liste dès la demande de vidage et n’y change rien pour une copie", () => {
   const pret = { statut: "pret", valeur: reception, perime: false } as const;
-  const projete = projeterAttentes(pret, "reception", [
-    operation("vider_dossier", "reception"),
-  ]);
-  const affichee = projete.statut === "pret" ? projete.valeur : reception;
-  expect(ids(affichee)).toEqual({ nouveaux: [], deja_vus: [] });
+  const affichee = (...attentes: EnAttente[]) => {
+    const projete = projeterAttentes(pret, "reception", attentes);
+    return projete.statut === "pret" ? projete.valeur : undefined;
+  };
+  expect(affichee(operation("copier", "a", "b"))).toBe(reception);
+  expect(ids(affichee(operation("deplacer", "a")) as PageFils)).toEqual({
+    nouveaux: ["c"],
+    deja_vus: ["b"],
+  });
+  const videe = affichee(operation("vider_dossier", "reception")) as PageFils;
+  expect(ids(videe)).toEqual({ nouveaux: [], deja_vus: [] });
 });

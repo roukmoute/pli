@@ -1,4 +1,10 @@
-import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
+import {
+  createEvent,
+  fireEvent,
+  render,
+  waitFor,
+  within,
+} from "@solidjs/testing-library";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import catalogue from "../../tests/dossiers.json";
 import { fil, page } from "../../tests/fils";
@@ -108,9 +114,11 @@ function ouvrir(options: Options) {
           (id) => !serveur.refus.includes(id),
         );
         // Un vidage confirmé emporte toute la liste, les autres départs leurs seuls fils.
+        // Une copie ne retire rien.
         const vide = demande.type === "vider_dossier" && confirmes.length;
+        const partis = demande.type === "copier" ? [] : confirmes;
         serveur.fils = serveur.fils.filter(
-          (f) => !vide && !confirmes.includes(f.id),
+          (f) => !vide && !partis.includes(f.id),
         );
         if (vide) serveur.horsPage = 0;
         serveur.revision++;
@@ -816,4 +824,271 @@ it("supprime ou restaure le fil ouvert selon le dossier d’où il vient", async
     "b",
   ]);
   await waitFor(() => expect(lignes()).toEqual([]));
+});
+
+it("déplace puis copie la sélection par le menu Plus et son sélecteur de dossiers", async () => {
+  const {
+    view,
+    serveur,
+    avatar,
+    archiver: lancer,
+    retenir,
+    commande,
+  } = ouvrir({
+    fils: [fil("a", 40), fil("b", 30), fil("c", 20)],
+    dossiers: tous,
+  });
+  await view.findByRole("button", { name: /Lettre a/ });
+  fireEvent.click(avatar("b"));
+  const plus = await view.findByRole("button", { name: "Plus" });
+  // « Plus » se déplie sur Déplacer et Copier, puis se replie.
+  expect(plus.getAttribute("aria-expanded")).toBe("false");
+  expect(commande("Déplacer")).toBeNull();
+  fireEvent.click(plus);
+  await view.findByRole("button", { name: "Copier" });
+  expect(plus.getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(plus);
+  await waitFor(() => expect(commande("Copier")).toBeNull());
+  fireEvent.click(plus);
+  await lancer("Déplacer");
+  const selecteur = await view.findByRole("dialog", { name: "Déplacer 1 fil" });
+  expect(commande("Copier")).toBeNull();
+  // Depuis Réception : les dossiers ouvrables du compte, sauf la boîte de réception.
+  const proposes = () =>
+    within(selecteur)
+      .getAllByRole("button")
+      .map((bouton) => bouton.textContent);
+  expect(proposes()).toEqual([
+    "Atelier",
+    "Envoyés",
+    "Archives",
+    "Papierkorb",
+    "Spam",
+    "Annuler",
+  ]);
+  expect(within(selecteur).queryByRole("alert")).toBeNull();
+  // Le filtre ignore la casse et les accents.
+  const filtre = within(selecteur).getByRole("searchbox", {
+    name: "Filtrer les dossiers",
+  });
+  fireEvent.input(filtre, { target: { value: " ENVOYES" } });
+  await waitFor(() => expect(proposes()).toEqual(["Envoyés", "Annuler"]));
+  fireEvent.input(filtre, { target: { value: "zzz" } });
+  await within(selecteur).findByText("Aucun dossier ne correspond.");
+  expect(proposes()).toEqual(["Annuler"]);
+  fireEvent.input(filtre, { target: { value: "" } });
+  const liberer = retenir();
+  fireEvent.click(
+    await within(selecteur).findByRole("button", { name: "Atelier" }),
+  );
+  // Le fil quitte la liste dès le choix du dossier.
+  expect(lignes()).toEqual(["a", "c"]);
+  expect(view.queryByRole("dialog")).toBeNull();
+  expect(serveur.demandes[0]).toMatchObject({
+    type: "deplacer",
+    vue: "reception",
+    cibles: ["b"],
+    destination: atelier.id,
+  });
+  expect(view.getByRole("status").textContent).toBe(
+    "0 fils sélectionnés sur 2Déplacement en attente pour 1 fil.",
+  );
+  liberer();
+  await waitFor(() =>
+    expect(view.getByRole("status").textContent).toBe(
+      "0 fils sélectionnés sur 2",
+    ),
+  );
+
+  fireEvent.click(avatar("a"));
+  fireEvent.click(avatar("c"));
+  await lancer("Plus");
+  await lancer("Copier");
+  const copie = await view.findByRole("dialog", { name: "Copier 2 fils" });
+  const relacher = retenir();
+  fireEvent.click(within(copie).getByRole("button", { name: "Archives" }));
+  await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
+  expect(serveur.demandes[1]).toMatchObject({
+    type: "copier",
+    vue: "reception",
+    cibles: ["a", "c"],
+    destination: archives.id,
+  });
+  // Les fils copiés restent dans leur liste, toujours cochés.
+  await waitFor(() =>
+    expect(view.getByRole("status").textContent).toBe(
+      "2 fils sélectionnés sur 2Copie en attente pour 2 fils.",
+    ),
+  );
+  expect(lignes()).toEqual(["a", "c"]);
+  relacher();
+  await waitFor(() =>
+    expect(view.getByRole("status").textContent).toBe(
+      "2 fils sélectionnés sur 2",
+    ),
+  );
+  expect(avatar("a").checked).toBe(true);
+  expect(view.queryByRole("alert")).toBeNull();
+});
+
+it("redemande un dossier quand celui du déplacement a disparu entre-temps", async () => {
+  const {
+    view,
+    serveur,
+    avatar,
+    archiver: lancer,
+  } = ouvrir({
+    fils: [fil("a", 40), fil("b", 30)],
+    dossiers: tous,
+  });
+  await view.findByRole("button", { name: /Lettre a/ });
+  fireEvent.click(avatar("a"));
+  fireEvent.click(avatar("b"));
+  await lancer("Plus");
+  await lancer("Déplacer");
+  const selecteur = await view.findByRole("dialog", {
+    name: "Déplacer 2 fils",
+  });
+  // Le dossier disparaît de la messagerie : le serveur refuse le fil b.
+  serveur.refus = ["b"];
+  serveur.dossiers = tous.filter((dossier) => dossier !== atelier);
+  fireEvent.click(within(selecteur).getByRole("button", { name: "Atelier" }));
+  expect(view.queryByRole("dialog")).toBeNull();
+  const reprise = await view.findByRole("dialog", { name: "Déplacer 1 fil" });
+  expect(within(reprise).getByRole("alert").textContent).toBe(
+    "Ce dossier n’existe plus. Choisissez une autre destination.",
+  );
+  expect(within(reprise).queryByRole("button", { name: "Atelier" })).toBeNull();
+  await waitFor(() => expect(lignes()).toEqual(["b"]));
+  serveur.refus = [];
+  fireEvent.click(within(reprise).getByRole("button", { name: "Archives" }));
+  await waitFor(() => expect(lignes()).toEqual([]));
+  expect(view.queryByRole("dialog")).toBeNull();
+  expect(
+    serveur.demandes.map(({ cibles, destination }) => [destination, ...cibles]),
+  ).toEqual([
+    [atelier.id, "a", "b"],
+    [archives.id, "b"],
+  ]);
+});
+
+it("copie le fil ouvert sans le quitter et le déplace en revenant à la liste", async () => {
+  const {
+    view,
+    envois,
+    archiver: lancer,
+  } = ouvrir({
+    fils: [fil("a", 40), fil("b", 30)],
+    dossiers: tous,
+  });
+  fireEvent.click(await view.findByRole("button", { name: /Lettre b/ }));
+  await view.findByRole("heading", { name: "Lettre b" });
+  await lancer("Plus");
+  await lancer("Copier");
+  const copie = await view.findByRole("dialog", { name: "Copier 1 fil" });
+  fireEvent.click(within(copie).getByRole("button", { name: "Atelier" }));
+  await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
+  // Le fil copié reste ouvert.
+  expect(window.location.pathname).toBe("/fil/b");
+  expect(view.getByRole("heading", { name: "Lettre b" })).toBeTruthy();
+  await lancer("Plus");
+  await lancer("Déplacer");
+  const deplacement = await view.findByRole("dialog", {
+    name: "Déplacer 1 fil",
+  });
+  fireEvent.click(
+    within(deplacement).getByRole("button", { name: "Archives" }),
+  );
+  await view.findByRole("heading", { name: "Réception" });
+  expect(envois()).toEqual([
+    ["copier", "reception", "b"],
+    ["deplacer", "reception", "b"],
+  ]);
+  await waitFor(() => expect(lignes()).toEqual(["a"]));
+});
+
+it("glisse une ligne ou la sélection vers un dossier, avec Ctrl ou Cmd pour copier", async () => {
+  const { view, serveur, ligne, avatar } = ouvrir({
+    fils: [fil("a", 40), fil("b", 30), fil("c", 20)],
+    dossiers: tous,
+  });
+  await view.findByRole("button", { name: /Lettre a/ });
+  const rangee = (id: string) => ligne(id).parentElement as HTMLElement;
+  const depot = () =>
+    view.queryByRole("complementary", { name: "Déposer dans un dossier" });
+  const transfert = { effectAllowed: "none" };
+  const avec = (touches: object) => (evenement: Event) =>
+    Object.assign(evenement, touches);
+  expect(depot()).toBeNull();
+  // Le glisser précède ici tout autre geste : la zone charge elle-même les dossiers.
+  fireEvent.dragStart(rangee("a"), { dataTransfer: transfert });
+  expect(transfert.effectAllowed).toBe("copyMove");
+  const zone = await view.findByRole("complementary", {
+    name: "Déposer dans un dossier",
+  });
+  await within(zone).findByText("Atelier");
+  const annonce = () => within(zone).getByRole("status").textContent;
+  const cible = (nom: string) => within(zone).getByText(nom);
+  expect(annonce()).toBe(
+    "Déposez sur un dossier. Ctrl ou Cmd copie au lieu de déplacer.",
+  );
+  expect(
+    within(zone)
+      .getAllByRole("listitem")
+      .map((dossier) => dossier.textContent),
+  ).toEqual(["Atelier", "Envoyés", "Archives", "Papierkorb", "Spam"]);
+  // Le survol autorise le dépôt et annonce ce qu’il fera.
+  const survol = createEvent.dragOver(cible("Atelier"));
+  fireEvent(cible("Atelier"), survol);
+  expect(survol.defaultPrevented).toBe(true);
+  await waitFor(() => expect(annonce()).toBe("Déplacer vers Atelier"));
+  expect(cible("Atelier").dataset.vise).toBe("oui");
+  expect(cible("Archives").dataset.vise).toBeUndefined();
+  fireEvent(
+    cible("Atelier"),
+    avec({ ctrlKey: true })(createEvent.dragOver(cible("Atelier"))),
+  );
+  await waitFor(() => expect(annonce()).toBe("Copier vers Atelier"));
+  fireEvent.dragLeave(cible("Atelier"));
+  await waitFor(() => expect(annonce()).toContain("Déposez sur un dossier."));
+  expect(cible("Atelier").dataset.vise).toBeUndefined();
+  const lacher = createEvent.drop(cible("Atelier"));
+  fireEvent(cible("Atelier"), lacher);
+  expect(lacher.defaultPrevented).toBe(true);
+  await waitFor(() => expect(lignes()).toEqual(["b", "c"]));
+  expect(serveur.demandes[0]).toMatchObject({
+    type: "deplacer",
+    vue: "reception",
+    cibles: ["a"],
+    destination: atelier.id,
+  });
+  await waitFor(() => expect(depot()).toBeNull());
+
+  // La ligne saisie fait partie de la sélection : tout le lot suit. Cmd demande une copie.
+  fireEvent.click(avatar("b"));
+  fireEvent.click(avatar("c"));
+  await view.findByText("2 fils sélectionnés sur 2");
+  fireEvent.dragStart(rangee("b"), { dataTransfer: transfert });
+  const seconde = await view.findByRole("complementary");
+  const archivesVisees = within(seconde).getByText("Archives");
+  fireEvent(
+    archivesVisees,
+    avec({ metaKey: true })(createEvent.drop(archivesVisees)),
+  );
+  await waitFor(() => expect(serveur.demandes).toHaveLength(2));
+  expect(serveur.demandes[1]).toMatchObject({
+    type: "copier",
+    vue: "reception",
+    cibles: ["b", "c"],
+    destination: archives.id,
+  });
+  expect(lignes()).toEqual(["b", "c"]);
+  await waitFor(() => expect(depot()).toBeNull());
+
+  // Un glisser abandonné referme le sélecteur sans rien envoyer.
+  fireEvent.dragStart(rangee("c"), { dataTransfer: transfert });
+  await view.findByRole("complementary");
+  fireEvent.dragEnd(rangee("c"));
+  await waitFor(() => expect(depot()).toBeNull());
+  expect(serveur.demandes).toHaveLength(2);
 });

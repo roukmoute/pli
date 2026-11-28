@@ -1,6 +1,7 @@
 import { useNavigate } from "@solidjs/router";
 import {
   createEffect,
+  createSignal,
   For,
   Match,
   onSettled,
@@ -16,6 +17,7 @@ import type { Suite } from "../sync/fenetre";
 import type { Selection } from "../sync/selection";
 import styles from "./courrier.module.css";
 import { suivreDefilement } from "./defilement";
+import { DepotDossiers } from "./Rangements";
 import { BarreSelection } from "./Selection";
 
 const dates = new Intl.DateTimeFormat("fr", {
@@ -34,6 +36,8 @@ function Ligne(props: {
   focus: () => void;
   ouvrir: () => void;
   selection: Selection;
+  /** Début et fin d’un glisser de cette ligne vers un dossier. */
+  glisser: (enCours: boolean) => void;
 }) {
   const nom = () =>
     props.fil.expediteur.nom ||
@@ -43,7 +47,16 @@ function Ligne(props: {
   const coche = () => props.selection.choisis().has(props.fil.id);
   const objet = () => props.fil.objet || t("noSubject");
   return (
-    <li class={styles.rangee} data-choisi={coche() ? "oui" : undefined}>
+    <li
+      class={styles.rangee}
+      data-choisi={coche() ? "oui" : undefined}
+      draggable="true"
+      onDragStart={(e) => {
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
+        props.glisser(true);
+      }}
+      onDragEnd={() => props.glisser(false)}
+    >
       <label class={styles.portrait}>
         <input
           type="checkbox"
@@ -192,6 +205,19 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
     entree.repere.fil = fil;
   }
 
+  // Fils en cours de glisser : la sélection si la ligne saisie en fait partie, sinon elle seule.
+  const [glisses, glisser] = createSignal<string[]>();
+  function saisir(fil: string) {
+    const choisis = entree.selection.choisis();
+    const presents = page();
+    const lot = presents
+      ? [...presents.nouveaux, ...presents.deja_vus]
+          .map((f) => f.id)
+          .filter((id) => choisis.has(id))
+      : [];
+    glisser(lot.includes(fil) ? lot : [fil]);
+  }
+
   onSettled(() => {
     let prochaineFrame: number | undefined;
     function actualiser() {
@@ -222,6 +248,16 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
     >
       <div class={styles.colonne}>
         <Nouveautes nombre={entree.arrivees.nombre()} voir={defilement.debut} />
+        <Show when={glisses()}>
+          {(lot) => (
+            <DepotDossiers
+              courrier={props.courrier}
+              vue={props.vue}
+              cibles={lot()}
+              deposer={() => glisser(undefined)}
+            />
+          )}
+        </Show>
         <header class={styles.enteteListe}>
           <h1 ref={titre} tabindex="-1">
             {props.titre}
@@ -299,6 +335,11 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                               <Ligne
                                 fil={fil()}
                                 selection={entree.selection}
+                                glisser={(enCours) =>
+                                  enCours
+                                    ? saisir(fil().id)
+                                    : glisser(undefined)
+                                }
                                 focus={() => retenir(section, fil().id)}
                                 ouvrir={() => {
                                   retenir(section, fil().id);

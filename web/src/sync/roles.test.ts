@@ -1,6 +1,10 @@
 import { expect, it } from "vitest";
 import catalogue from "../../tests/dossiers.json";
-import { dossierDeVue, dossiersDeRestauration } from "./roles";
+import {
+  dossierDeVue,
+  dossiersDeDestination,
+  dossiersDeRestauration,
+} from "./roles";
 import type { Dossier } from "./vues";
 
 const { inbox, atelier, classement, envoyes, archives, corbeille, reclames } =
@@ -35,4 +39,24 @@ it("propose pour une restauration les dossiers ouvrables hors Corbeille et Indé
   ]);
   for (const statut of ["chargement", "erreur"] as const)
     expect(dossiersDeRestauration({ statut })).toEqual([]);
+});
+
+it("propose pour un rangement tous les dossiers ouvrables sauf celui de départ", () => {
+  // Réception part de la boîte de réception.
+  expect(dossiersDeDestination(pret, "reception")).toEqual([
+    atelier,
+    envoyes,
+    archives,
+    corbeille,
+    reclames,
+  ]);
+  expect(dossiersDeDestination(pret, "dossier/2")).toEqual([
+    inbox,
+    envoyes,
+    archives,
+    corbeille,
+    reclames,
+  ]);
+  for (const statut of ["chargement", "erreur"] as const)
+    expect(dossiersDeDestination({ statut }, "reception")).toEqual([]);
 });

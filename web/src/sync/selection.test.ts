@@ -144,3 +144,25 @@ it("efface l’annonce d’un vidage refusé dès que le suivant part", async ()
   flush();
   expect(choix.vidageRefuse()).toBe(false);
 });
+
+it("copie les fils sans toucher à leur coche et rend les fils refusés", async () => {
+  const lancer = vi
+    .fn<(type: string, ids: string[], dossier?: number) => Promise<string[]>>()
+    .mockResolvedValue([])
+    .mockResolvedValueOnce(["b"])
+    .mockResolvedValueOnce(["a"]);
+  const choix = creerSelection(lancer);
+  choix.cocher(["a", "b"], true);
+  flush();
+  expect(await choix.copier([], 7)).toEqual([]);
+  expect(lancer).not.toHaveBeenCalled();
+  expect(await choix.copier(["a", "b", "c"], 7)).toEqual(["b"]);
+  expect(lancer.mock.calls).toEqual([["copier", ["a", "b", "c"], 7]]);
+  // Les fils copiés restent dans leur liste, cochés comme avant.
+  expect(choisis(choix)).toEqual(["a", "b"]);
+  expect(echecs(choix)).toBe(1);
+  // Un déplacement rend aussi ses refus à qui l’a lancé.
+  expect(await choix.partir("deplacer", ["a", "b"], 7)).toEqual(["a"]);
+  expect(await choix.partir("deplacer", [], 7)).toEqual([]);
+  expect(choisis(choix)).toEqual(["a"]);
+});

@@ -2,6 +2,7 @@ import { createSignal, Match, Show, Switch } from "solid-js";
 import { t } from "../i18n";
 import type { Courrier, Dossier, Vue } from "../sync";
 import { filsDe } from "../sync/fenetre";
+import type { Rangement } from "../sync/rangements";
 import { dossierDeVue, dossiersDeRestauration } from "../sync/roles";
 import type { Depart } from "../sync/selection";
 import { ChoixDossier, CommandeArchiver, Confirmation } from "./Archives";
@@ -48,6 +49,7 @@ export function CommandesDepart(props: {
   class?: string;
 }) {
   const [demande, demander] = createSignal<"confirmation" | "dossier">();
+  const [plus, deplier] = createSignal(false);
   const dossier = () => dossierDeVue(props.courrier.dossiers.etat(), props.vue);
   const role = () => dossier()?.role;
   const entree = () => props.courrier.obtenirVue(props.vue);
@@ -66,6 +68,12 @@ export function CommandesDepart(props: {
       filsDe(page).some((fil) => cibles.has(fil.id) && fil.sans_origine);
     if (inconnue) demander("dossier");
     else partir("restaurer");
+  }
+  // Déplacer et Copier demandent ensuite leur dossier dans le sélecteur.
+  function ranger(type: Rangement) {
+    deplier(false);
+    const rangements = props.courrier.rangements;
+    rangements.proposer(type, props.vue, props.cibles(), props.apres);
   }
   return (
     <>
@@ -104,6 +112,30 @@ export function CommandesDepart(props: {
           </button>
         </Match>
       </Switch>
+      <button
+        type="button"
+        class={props.class}
+        aria-expanded={plus() ? "true" : "false"}
+        onClick={() => deplier(!plus())}
+      >
+        {t("more")}
+      </button>
+      <Show when={plus()}>
+        <button
+          type="button"
+          class={props.class}
+          onClick={() => ranger("deplacer")}
+        >
+          {t("move")}
+        </button>
+        <button
+          type="button"
+          class={props.class}
+          onClick={() => ranger("copier")}
+        >
+          {t("copy")}
+        </button>
+      </Show>
       <Show when={demande() === "confirmation" && dossier()}>
         {(corbeille) => (
           <Confirmation

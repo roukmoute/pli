@@ -14,3 +14,15 @@ export function dossiersDeRestauration(catalogue: Etat<Dossier[]>) {
     (d) => d.selectable && d.role !== "trash" && d.role !== "junk",
   );
 }
+
+/**
+ * Dossiers où ranger du courrier depuis cette vue : ceux qui en reçoivent, sauf
+ * celui d’où il part. Une vue logique, comme Réception, part de la boîte de réception.
+ */
+export function dossiersDeDestination(catalogue: Etat<Dossier[]>, vue: string) {
+  if (catalogue.statut !== "pret") return [];
+  const depart = vue.startsWith("dossier/")
+    ? (d: Dossier) => `dossier/${d.id}` === vue
+    : (d: Dossier) => d.role === "inbox";
+  return catalogue.valeur.filter((d) => d.selectable && !depart(d));
+}

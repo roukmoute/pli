@@ -39,7 +39,7 @@ export function viderVue(
   };
 }
 
-/** Départs que la messagerie n’a pas fini de traiter depuis cette vue, par type. */
+/** Départs et copies que la messagerie n’a pas fini de traiter depuis cette vue, par type. */
 export interface Partance {
   type: TypeOperation;
   nombre: number;
@@ -51,6 +51,8 @@ const DEPARTS: readonly TypeOperation[] = [
   "restaurer",
   "supprimer_definitivement",
   "vider_dossier",
+  "deplacer",
+  "copier",
 ];
 
 export function partances(
@@ -108,5 +110,11 @@ function conclure(projeter: typeof retirerFils) {
   };
 }
 
+/** Une copie laisse sa liste de départ telle quelle. */
+export function laisser(page: PageFils): PageFils {
+  return page;
+}
+
 export const conclureDepart = conclure(retirerFils);
 export const conclureVidage = conclure(viderVue);
+export const conclureCopie = conclure(laisser);

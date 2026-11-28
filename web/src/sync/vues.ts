@@ -6,6 +6,7 @@ import { appliquerLecture, creerLectures } from "./lecture";
 import { creerOperations, type TypeOperation } from "./operations";
 import { lireDossiers, lirePage, type Tranche } from "./pages-api";
 import { amorcerVue, projeterTri } from "./projection-tri";
+import { creerRangements } from "./rangements";
 import { type Etat, ressource } from "./ressource";
 import { creerSelection } from "./selection";
 import { creerTri } from "./tri";
@@ -194,9 +195,14 @@ export function creerCourrier(compte: number, lectureEnSerie = false) {
     }
     return entree;
   }
+  const rangements = creerRangements(
+    dossiers,
+    (vue) => obtenirVue(vue as Vue).selection,
+  );
   return {
     dossiers,
     archives,
+    rangements,
     lectures,
     lectureEnSerie,
     tri,

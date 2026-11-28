@@ -14,6 +14,8 @@ const attentes: Partial<Record<Partance["type"], CleLibelle>> = {
   corbeille: "trashPending",
   restaurer: "restorePending",
   supprimer_definitivement: "deletePending",
+  deplacer: "movePending",
+  copier: "copyPending",
 };
 
 function EnPartance(props: { partance: Partance }) {

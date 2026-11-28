@@ -12,6 +12,15 @@
   margin: 0;
   font-size: 1.15rem;
 }
+.choix input {
+  width: 100%;
+  min-height: var(--cible-tactile);
+  margin-bottom: 0.6rem;
+  padding-inline: 0.6rem;
+  border: 1px solid var(--bord-controle);
+  border-radius: var(--rayon-controle);
+  font: inherit;
+}
 .choix ul {
   display: grid;
   gap: 0.4rem;
@@ -439,6 +448,42 @@
 }
 .selection [role="alert"] {
   color: var(--erreur);
+}
+.depot {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 2;
+  padding: 0.6rem 0.9rem;
+  border: 1px dashed var(--bord-controle);
+  border-radius: var(--rayon-surface);
+  background: var(--surface);
+  box-shadow: 0 0.5rem 1.5rem #24223724;
+}
+.depot p {
+  margin: 0 0 0.5rem;
+  color: var(--texte-secondaire);
+  font-size: 0.9rem;
+}
+.depot ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.depotDossier {
+  min-height: var(--cible-tactile);
+  display: flex;
+  align-items: center;
+  padding-inline: 0.8rem;
+  border: 1px solid var(--bord-controle);
+  border-radius: var(--rayon-controle);
+  color: var(--commande);
+}
+.depotDossier:where([data-vise]) {
+  outline: var(--contour-selection);
+  font-weight: 600;
 }
 .partance {
   margin-left: 0.5rem;
