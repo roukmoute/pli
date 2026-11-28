@@ -4,13 +4,15 @@ use super::{
     parameter,
 };
 
-const SCRIPT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/archivage.mjs");
+const ARCHIVAGE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/archivage.mjs");
+const CORBEILLE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/corbeille.mjs");
 const BOITE: &str =
     "une boîte dont la messagerie laisse une lettre sur place au premier archivage est rattachée";
 const GESTE: &str =
     "j’archive deux fils sélectionnés après avoir consulté le premier dans le navigateur";
+const VIDAGE: &str = "je supprime, restaure puis vide la corbeille dans le navigateur";
 // Début et fin de chaque étape, autour de la valeur attendue, et mesure rendue par la sonde.
-const MESURES: [(&str, &str, &str); 7] = [
+const MESURES: [(&str, &str, &str); 14] = [
     ("la liste perd ", " fils avant toute réponse", "immediats"),
     (
         "le fil consulté reste avec ",
@@ -38,10 +40,33 @@ const MESURES: [(&str, &str, &str); 7] = [
         " lettre",
         "deplaces",
     ),
+    (
+        "la suppression retire ",
+        " fil avant toute réponse et sans confirmation",
+        "immediats",
+    ),
+    ("la restauration ramène ", " lettre en Réception", "revenus"),
+    ("Réception compte alors ", " fils", "reception"),
+    ("la corbeille compte alors ", " fil", "restants"),
+    (
+        "le vidage annulé garde ",
+        " lettres dans la corbeille",
+        "gardes",
+    ),
+    (
+        "la suppression définitive épargne ",
+        " lettre non ciblée",
+        "epargnes",
+    ),
+    (
+        "le vidage confirmé laisse ",
+        " lettre dans la corbeille",
+        "videe",
+    ),
 ];
 
 impl World {
-    pub(super) async fn archivage_step(
+    pub(super) async fn depart_step(
         &mut self,
         texte: &str,
         exemple: &Example,
@@ -56,9 +81,13 @@ impl World {
                 .screener_bench
                 .as_ref()
                 .ok_or_else(|| Problem::infra("Boîte d’archivage absente."))?;
-            let mut sonde = commande_navigation(SCRIPT, self.address);
+            let mut sonde = commande_navigation(ARCHIVAGE, self.address);
             sonde.arg(&boite.address);
             self.lecture = observer(&mut sonde).await?;
+            return Ok(true);
+        }
+        if texte == VIDAGE {
+            self.lecture = observer(&mut commande_navigation(CORBEILLE, self.address)).await?;
             return Ok(true);
         }
         for (debut, fin, mesure) in MESURES {
@@ -66,7 +95,7 @@ impl World {
                 let valeur = self
                     .lecture
                     .get(mesure)
-                    .ok_or_else(|| Problem::Step("Observation d’archivage absente.".into()))?;
+                    .ok_or_else(|| Problem::Step("Observation du navigateur absente.".into()))?;
                 expect(valeur.to_string().as_str(), example_value(exemple, cle)?)?;
                 return Ok(true);
             }
@@ -80,7 +109,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn exige_chaque_mesure_de_l_archivage() {
+    async fn exige_chaque_mesure_d_un_depart() {
         let mut world = World::new("127.0.0.1:1".parse().unwrap()).unwrap();
         world.response = Some((reqwest::StatusCode::OK, "{}".into()));
         let attendu = |valeur: &str| Example::from([("n".into(), valeur.into())]);
@@ -92,11 +121,11 @@ mod tests {
             assert!(world.step(&etape, &attendu("9")).await.is_err(), "{etape}");
             world.lecture.clear();
         }
-        let autre = world.archivage_step("autre étape", &attendu("8")).await;
+        let autre = world.depart_step("autre étape", &attendu("8")).await;
         assert!(!autre.unwrap());
-        // Sans base de recette ni boîte rattachée, aucun des deux gestes n’aboutit.
+        // Sans base de recette ni boîte rattachée, aucun des deux gestes d’archivage n’aboutit.
         for geste in [BOITE, GESTE] {
-            assert!(world.archivage_step(geste, &attendu("8")).await.is_err());
+            assert!(world.depart_step(geste, &attendu("8")).await.is_err());
         }
     }
 }
