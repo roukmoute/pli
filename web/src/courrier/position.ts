@@ -52,3 +52,54 @@ export function restaurerPosition(zone: HTMLElement, repere: Repere) {
   if (repere.fil) retrouver(repere.fil)?.focus({ preventScroll: true });
   delete repere.lecture;
 }
+
+export interface Appui {
+  fil: string;
+  decalage: number;
+}
+
+// Relevé pris avant une mise à jour de la liste : les lignes visibles et leur
+// place, celle sous le pointeur en tête. En haut de liste, rien n’est retenu
+// et le nouveau courrier pousse simplement les lignes.
+export function releverAppuis(
+  zone: HTMLElement,
+  pointe: Element | null | undefined,
+): Appui[] {
+  if (!zone.scrollTop) return [];
+  const cadre = zone.getBoundingClientRect();
+  const survolee = pointe?.closest("li")?.querySelector("[data-fil]");
+  const appuis: Appui[] = [];
+  for (const ligne of lignes(zone)) {
+    const { top, bottom } = ligne.getBoundingClientRect();
+    if (bottom > cadre.top && top < cadre.bottom) {
+      const appui = {
+        fil: ligne.dataset.fil as string,
+        decalage: top - cadre.top,
+      };
+      if (ligne === survolee) appuis.unshift(appui);
+      else appuis.push(appui);
+    }
+  }
+  return appuis;
+}
+
+// Replace le premier appui encore présent là où il a été relevé.
+export function retablirAppui(zone: HTMLElement, appuis: Appui[]) {
+  const presentes = lignes(zone);
+  for (const appui of appuis) {
+    const ligne = presentes.find((l) => l.dataset.fil === appui.fil);
+    if (ligne) {
+      zone.scrollTop +=
+        ligne.getBoundingClientRect().top -
+        zone.getBoundingClientRect().top -
+        appui.decalage;
+      return;
+    }
+  }
+}
+
+export function viserDebut(zone: HTMLElement) {
+  zone.scrollTop = 0;
+  for (const ligne of lignes(zone).slice(0, 1))
+    ligne.focus({ preventScroll: true });
+}

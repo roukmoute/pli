@@ -12,9 +12,10 @@ import { Avatar } from "../components/Avatar";
 import { t } from "../i18n";
 import { Icone } from "../icons/Icone";
 import type { Courrier, Fil, Section, Vue } from "../sync";
+import type { Suite } from "../sync/fenetre";
 import type { Selection } from "../sync/selection";
 import styles from "./courrier.module.css";
-import { memoriserAncre, restaurerPosition } from "./position";
+import { suivreDefilement } from "./defilement";
 import { BarreSelection } from "./Selection";
 
 const dates = new Intl.DateTimeFormat("fr", {
@@ -111,6 +112,40 @@ function Ligne(props: {
   );
 }
 
+// Accès flottant en haut de la zone : il ne déplace aucune ligne en apparaissant.
+function Nouveautes(props: { nombre: number; voir: () => void }) {
+  return (
+    <div class={styles.nouveautes} aria-live="polite">
+      <Show when={props.nombre}>
+        <button type="button" class={styles.pastille} onClick={props.voir}>
+          {t("news")} <strong>{props.nombre}</strong>
+        </button>
+      </Show>
+    </div>
+  );
+}
+
+// Le défilement demande la suite de lui-même. Le bouton reste le repli au clavier.
+function PageSuivante(props: { suite: Suite }) {
+  return (
+    <div class={styles.suite}>
+      <button
+        type="button"
+        class={styles.suivants}
+        aria-busy={props.suite.enCours() ? "true" : "false"}
+        onClick={() => void props.suite.charger()}
+      >
+        {t("moreThreads")}
+      </button>
+      <Show when={props.suite.echec()}>
+        <p role="alert" class={styles.echecSuite}>
+          {t("moreThreadsError")}
+        </p>
+      </Show>
+    </div>
+  );
+}
+
 export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
   const naviguer = useNavigate();
   const entree = props.courrier.obtenirVue(props.vue);
@@ -124,7 +159,12 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
     return e.statut === "pret" && e.perime;
   };
   let zone!: HTMLElement;
-  let image: number | undefined;
+  let actualisee = false;
+  const defilement = suivreDefilement(
+    entree,
+    () => zone,
+    () => actualisee,
+  );
   createEffect(etat, (courant) => {
     if (
       courant.statut === "pret" &&
@@ -139,26 +179,16 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
     }
   });
 
-  function memoriserDefilement() {
-    entree.repere.defilement = zone.scrollTop;
-    if (image !== undefined) return;
-    image = requestAnimationFrame(() => {
-      image = undefined;
-      memoriserAncre(zone, entree.repere);
-    });
-  }
-
   function retenir(section: Section, fil: string) {
     entree.repere.section = section;
     entree.repere.fil = fil;
   }
 
   onSettled(() => {
-    restaurerPosition(zone, entree.repere);
-    window.addEventListener("resize", memoriserDefilement);
     let prochaineFrame: number | undefined;
     function actualiser() {
       prochaineFrame = undefined;
+      actualisee = true;
       void props.courrier.chargerVue(props.vue);
     }
     if (untrack(page)) {
@@ -170,15 +200,20 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
       actualiser();
     }
     return () => {
-      window.removeEventListener("resize", memoriserDefilement);
       if (prochaineFrame !== undefined) cancelAnimationFrame(prochaineFrame);
-      if (image !== undefined) cancelAnimationFrame(image);
     };
   });
 
   return (
-    <main ref={zone} class={styles.defilement} onScroll={memoriserDefilement}>
+    <main
+      ref={zone}
+      class={styles.defilement}
+      onScroll={defilement.mesurer}
+      onPointerMove={defilement.pointer}
+      onPointerLeave={defilement.quitter}
+    >
       <div class={styles.colonne}>
+        <Nouveautes nombre={entree.arrivees.nombre()} voir={defilement.debut} />
         <header class={styles.enteteListe}>
           <h1>{props.titre}</h1>
           <a href="/ecrire" class={styles.ecrire} aria-label={t("compose")}>
@@ -276,6 +311,9 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                     </section>
                   )}
                 </For>
+                <Show when={contenu().curseur_suivant}>
+                  <PageSuivante suite={entree.suite} />
+                </Show>
               </>
             )}
           </Match>
