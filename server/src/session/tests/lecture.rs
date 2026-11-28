@@ -1,3 +1,5 @@
+mod operations;
+
 use super::*;
 use crate::test_support::BOITES_DE_TEST;
 use folders::{login_dialog, ok};

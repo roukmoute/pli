@@ -20,7 +20,7 @@ use crate::{
     session::CompteAuthentifie,
     sync::Lecteur,
 };
-pub(crate) use indicateurs::Indicateur;
+pub(crate) use indicateurs::{LU, enregistrer};
 pub(crate) use stockage::Cle;
 
 pub(crate) fn router(lecteur: Lecteur) -> Router<Arc<Database>> {
@@ -41,7 +41,7 @@ fn absent() -> ApiError {
     )
 }
 
-async fn sqlite<T: Send + 'static>(
+pub(crate) async fn sqlite<T: Send + 'static>(
     db: Arc<Database>,
     action: impl FnOnce(&Database) -> Result<T, Error> + Send + 'static,
 ) -> Result<T, ApiError> {
@@ -123,23 +123,19 @@ async fn ouvrir(
     })
     .await?
     .ok_or_else(absent)?;
-    let confirmations = lecteur
-        .marquer(
-            compte,
-            cle.generation,
-            &chemin,
-            &[cle.uid],
-            Indicateur::Lu,
-            true,
+    let non_confirmee = |_| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "lecture_non_confirmee",
+            "La messagerie n’a pas confirmé la lecture.",
         )
+    };
+    // Les opérations plus anciennes passent d’abord : la lecture reste la dernière intention.
+    lecteur.rattraper(compte).await.map_err(non_confirmee)?;
+    let confirmations = lecteur
+        .marquer(compte, cle.generation, &chemin, &[cle.uid], LU, true)
         .await
-        .map_err(|_| {
-            api_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "lecture_non_confirmee",
-                "La messagerie n’a pas confirmé la lecture.",
-            )
-        })?;
+        .map_err(non_confirmee)?;
     if confirmations.get(&cle.uid) != Some(&true) {
         return Err(absent());
     }

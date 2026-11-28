@@ -7,6 +7,18 @@ use crate::{Error, admin::ImapSession};
 
 pub(super) const COMMAND_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Réponse définitive du serveur : rejouer la même commande ne changerait rien.
+#[derive(Debug)]
+pub(super) struct Refus;
+
+impl std::fmt::Display for Refus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Commande IMAP refusée.")
+    }
+}
+
+impl std::error::Error for Refus {}
+
 // Les flux LIST/FETCH de la bibliothèque se terminent aussi sur NO ou sur EOF.
 // Seule la réponse OK étiquetée permet de publier le lot ou d'avancer le repère de lecture.
 pub(super) async fn command(
@@ -23,7 +35,7 @@ pub(super) async fn command(
                 } if *end == tag => {
                     return match status {
                         Status::Ok => Ok(()),
-                        _ => Err("Commande IMAP refusée.".into()),
+                        _ => Err(Refus.into()),
                     };
                 }
                 response => collect(response)?,

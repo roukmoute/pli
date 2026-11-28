@@ -2,6 +2,7 @@ mod admin;
 mod db;
 mod http;
 mod lecture;
+mod operations;
 mod pages;
 mod session;
 mod sync;

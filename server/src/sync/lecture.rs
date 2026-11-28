@@ -1,3 +1,5 @@
+mod operations;
+
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -5,32 +7,33 @@ use std::{
 
 use async_imap::imap_proto::{AttributeValue, Response};
 use tokio::{
-    sync::{Mutex, OwnedMutexGuard},
+    sync::{Mutex, Notify, OwnedMutexGuard},
     time::timeout,
 };
 
 use super::{
     Context, Synchronizer,
-    imap::{COMMAND_TIMEOUT, command},
+    imap::{COMMAND_TIMEOUT, Refus, command},
 };
-use crate::{
-    Error,
-    admin::ImapSession,
-    lecture::{Cle, Indicateur},
-};
+use crate::{Error, admin::ImapSession, lecture::Cle};
 
 #[derive(Clone)]
 pub(crate) struct Lecteur {
     context: Arc<Context>,
     ecritures: Arc<Mutex<HashMap<i64, Arc<Mutex<()>>>>>,
+    files: Arc<std::sync::Mutex<HashMap<i64, Arc<Notify>>>>,
 }
 
 impl Synchronizer {
+    /// Les copies du lecteur partagent ses verrous d’écriture et ses files d’opérations.
     pub(crate) fn lecteur(&self) -> Lecteur {
-        Lecteur {
+        let lecteur = Lecteur {
             context: self.context.clone(),
             ecritures: Default::default(),
-        }
+            files: Default::default(),
+        };
+        lecteur.reprendre();
+        lecteur
     }
 }
 
@@ -58,13 +61,20 @@ impl Lecteur {
             .reconnect(compte)
             .await
             .map_err(|_| "Messagerie indisponible.")?;
-        let dossier = if ecriture {
-            timeout(COMMAND_TIMEOUT, session.select(chemin)).await??
+        let choix = if ecriture {
+            timeout(COMMAND_TIMEOUT, session.select(chemin)).await?
         } else {
-            timeout(COMMAND_TIMEOUT, session.examine(chemin)).await??
+            timeout(COMMAND_TIMEOUT, session.examine(chemin)).await?
         };
+        let dossier = match choix {
+            Err(async_imap::error::Error::No(_) | async_imap::error::Error::Bad(_)) => {
+                return Err(Refus.into());
+            }
+            autre => autre?,
+        };
+        // Une autre génération désigne d’autres lettres sous les mêmes UID.
         if dossier.uid_validity != Some(generation) {
-            return Err("La génération IMAP du dossier a changé.".into());
+            return Err(Refus.into());
         }
         Ok(session)
     }
@@ -106,7 +116,7 @@ impl Lecteur {
         generation: u32,
         chemin: &str,
         uids: &[u32],
-        indicateur: Indicateur,
+        drapeau: &str,
         valeur: bool,
     ) -> Result<BTreeMap<u32, bool>, Error> {
         let mut session = self.session(compte, generation, chemin, true).await?;
@@ -116,7 +126,6 @@ impl Lecteur {
             .collect::<Vec<_>>()
             .join(",");
         let signe = if valeur { "+" } else { "-" };
-        let drapeau = indicateur.imap();
         let commande = format!("UID STORE {ids} {signe}FLAGS ({drapeau})");
         let mut etats = BTreeMap::new();
         command(&mut session, &commande, |reponse| {

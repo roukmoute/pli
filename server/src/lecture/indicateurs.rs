@@ -17,17 +17,20 @@ use crate::{
     sync::Lecteur,
 };
 
+/// Drapeau IMAP d’une lettre lue.
+pub(crate) const LU: &str = "\\Seen";
+
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum Indicateur {
+enum Indicateur {
     Lu,
     Etoile,
 }
 
 impl Indicateur {
-    pub(crate) fn imap(self) -> &'static str {
+    fn imap(self) -> &'static str {
         match self {
-            Self::Lu => "\\Seen",
+            Self::Lu => LU,
             Self::Etoile => "\\Flagged",
         }
     }
@@ -127,7 +130,7 @@ fn confirmer(
             uid,
         };
         if stockage::chemin(&tx, compte, cle)?.is_some() {
-            enregistrer(&tx, compte, cle, action.indicateur, action.valeur)?;
+            enregistrer(&tx, compte, cle, action.indicateur.imap(), action.valeur)?;
         } else {
             *etat = Etat::Absent;
         }
@@ -136,11 +139,12 @@ fn confirmer(
     Ok(etats)
 }
 
-pub(super) fn enregistrer(
+/// Pose ou retire un drapeau dans la projection d’une lettre.
+pub(crate) fn enregistrer(
     db: &Connection,
     compte: i64,
     cle: Cle,
-    indicateur: Indicateur,
+    drapeau: &str,
     valeur: bool,
 ) -> rusqlite::Result<()> {
     db.prepare_cached(
@@ -148,7 +152,7 @@ pub(super) fn enregistrer(
            ELSE (SELECT json_group_array(value) FROM json_each(messages.flags) WHERE lower(value)!=lower(?5)) END
          WHERE (account_id,folder_id,uidvalidity,uid)=(?1,?2,?3,?4)
            AND EXISTS(SELECT 1 FROM json_each(flags) WHERE lower(value)=lower(?5)) != ?6"
-    )?.execute(params![compte, cle.dossier, cle.generation, cle.uid, indicateur.imap(), valeur])?;
+    )?.execute(params![compte, cle.dossier, cle.generation, cle.uid, drapeau, valeur])?;
     Ok(())
 }
 
@@ -167,7 +171,7 @@ async fn traiter(
             *generation,
             chemin,
             uids,
-            action.indicateur,
+            action.indicateur.imap(),
             action.valeur,
         )
         .await;

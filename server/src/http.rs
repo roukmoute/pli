@@ -22,8 +22,10 @@ pub fn router(
     sessions: session::SessionConfig,
 ) -> Result<Router, Error> {
     let sync = sync::Synchronizer::start(db.clone(), sessions.key.clone(), config.allow_test)?;
+    let lecteur = sync.lecteur();
     let api = Router::new()
-        .merge(crate::lecture::router(sync.lecteur()))
+        .merge(crate::lecture::router(lecteur.clone()))
+        .merge(crate::operations::router(lecteur))
         .merge(session::router(
             db.clone(),
             sessions,

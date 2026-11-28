@@ -174,7 +174,7 @@ pub(super) fn confirmer(db: &Database, compte: i64, cle: Cle) -> Result<Option<L
         |r| r.get(0),
     ).optional()?;
     let Some(fil) = fil else { return Ok(None) };
-    super::indicateurs::enregistrer(&tx, compte, cle, super::Indicateur::Lu, true)?;
+    super::enregistrer(&tx, compte, cle, super::LU, true)?;
     let revision = tx.query_row(
         "SELECT revision FROM account_revisions WHERE account_id=?1",
         [compte],
