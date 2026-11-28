@@ -54,6 +54,7 @@ async function lireJusquA(lire: LecteurDePage, connus: Fil[]) {
   let frais = await lire();
   let stable = true;
   while (frais.curseur_suivant && connus.some((fil) => suit(fil, frais))) {
+    // Quand tout le connu est relu, zéro laisse le serveur choisir sa taille de page.
     const reste = connus.length - filsDe(frais).length;
     const page = await lire({
       curseur: frais.curseur_suivant,
