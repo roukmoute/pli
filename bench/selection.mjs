@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { connecter, ouvrirNavigateur } from "./navigateur.mjs";
 
@@ -62,23 +63,26 @@ try {
     .getByRole("listitem")
     .filter({ has: b })
     .getByRole("button", { name: "Étoile", exact: true });
-  const soumission = () =>
-    page.waitForResponse(
-      (r) =>
-        r.url().endsWith("/messages/flags") && r.request().method() === "POST",
+  // La liste réagit dès le geste. La boîte change quand la messagerie a confirmé.
+  const confirmations = async (geste) => {
+    const envoi = page.waitForResponse(
+      (r) => r.url().endsWith("/operations") && r.request().method() === "POST",
     );
-  const attente = soumission();
-  await etoile.click();
-  assert.equal((await attente).status(), 200);
-  await page.waitForFunction(() =>
-    document.querySelector('button[aria-label="Étoile"][aria-pressed="true"]'),
-  );
+    await geste();
+    assert.equal((await envoi).status(), 200);
+    await page.waitForFunction(
+      () =>
+        !document.querySelector("[data-attente]") &&
+        !document.querySelector("main")?.textContent.includes("En attente"),
+    );
+  };
+  await confirmations(() => etoile.click());
   assert.equal(await etoile.getAttribute("aria-pressed"), "true");
   assert(await b.isChecked());
   assert.equal(new URL(page.url()).pathname, "/reception");
-  await page
-    .getByRole("button", { name: "Marquer comme lu", exact: true })
-    .click();
+  await confirmations(() =>
+    page.getByRole("button", { name: "Marquer comme lu", exact: true }).click(),
+  );
   await vus.getByRole("button", { name: objetB }).waitFor();
   await vus.getByRole("button", { name: objetC }).waitFor();
   assert.equal(
@@ -97,9 +101,11 @@ try {
   );
   await b.check();
   await c.check();
-  await page
-    .getByRole("button", { name: "Marquer comme non lu", exact: true })
-    .click();
+  await confirmations(() =>
+    page
+      .getByRole("button", { name: "Marquer comme non lu", exact: true })
+      .click(),
+  );
   const nouveaux = page.locator('[data-section="nouveaux"]');
   await nouveaux.getByRole("button", { name: objetB }).waitFor();
   await nouveaux.getByRole("button", { name: objetC }).waitFor();
@@ -114,13 +120,15 @@ try {
   );
   const [lettre] = await messages.json();
   const reponse = await autre.request.post(
-    new URL("/api/v1/messages/flags", base).href,
+    new URL("/api/v1/operations", base).href,
     {
-      data: { ids: [lettre.id], indicateur: "lu", valeur: true },
+      data: { id: randomUUID(), type: "lu", cibles: [lettre.id] },
     },
   );
   assert.equal(reponse.status(), 200);
-  const [resultat] = await reponse.json();
+  const {
+    resultats: [resultat],
+  } = await reponse.json();
   assert.equal(resultat.id, lettre.id);
   assert.equal(nonLus(), avant);
   console.log(

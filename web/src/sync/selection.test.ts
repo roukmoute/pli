@@ -1,81 +1,68 @@
+import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { reponseRetenue } from "../../tests/reponse-retenue";
 import { creerSelection } from "./selection";
 
-it("réserve le lot pendant la confirmation et garde les cibles à réessayer", async () => {
-  const attente = reponseRetenue();
-  const fetch = vi
-    .fn()
-    .mockReturnValueOnce(attente.promise)
-    .mockResolvedValueOnce(Response.json([{ id: "b", etat: "confirme" }]))
-    .mockRejectedValueOnce(new Error("coupure"));
-  vi.stubGlobal("fetch", fetch);
-  const actualiser = vi.fn(async () => {});
-  const choix = creerSelection("dossier/8", actualiser);
-  expect(choix.echecs()).toBe(0);
-  expect(choix.enCours()).toBe(false);
-  choix.cocher(["a", "b", "c"], true);
-  choix.cocher(["c"], false);
+function choisis(choix: ReturnType<typeof creerSelection>) {
+  flush();
+  return [...choix.choisis()];
+}
+
+function echecs(choix: ReturnType<typeof creerSelection>) {
+  flush();
+  return choix.echecs();
+}
+
+it("retire le lot de la sélection dès le geste et y ramène les fils refusés", async () => {
+  const retenue = reponseRetenue<string[]>();
+  const lancer = vi.fn(() => retenue.promise);
+  const choix = creerSelection(lancer);
+  expect(echecs(choix)).toBe(0);
+  choix.cocher(["a", "b", "c", "d"], true);
+  choix.cocher(["d"], false);
+  expect(choisis(choix)).toEqual(["a", "b", "c"]);
   await choix.marquer([], "lu", false);
-  expect(fetch).not.toHaveBeenCalled();
-  const ecriture = choix.marquer(["a", "b"], "lu", true);
-  await choix.marquer(["a"], "etoile", true);
-  expect(choix.enCours()).toBe(true);
-  expect(choix.echecs()).toBe(0);
-  expect(fetch).toHaveBeenCalledTimes(1);
-  const [url, options] = fetch.mock.calls[0];
-  expect(url).toBe("/api/v1/messages/flags");
-  expect(options.method).toBe("POST");
-  expect(JSON.parse(options.body)).toEqual({
-    vue: "dossier/8",
-    ids: ["a", "b"],
-    indicateur: "lu",
-    valeur: true,
-  });
-  attente.resolve(
-    Response.json([
-      { id: "a", etat: "confirme" },
-      { id: "b", etat: "partiel" },
-    ]),
-  );
+  expect(lancer).not.toHaveBeenCalled();
+  // Le fil d fait partie du lot sans être coché : un refus ne le sélectionne pas.
+  const ecriture = choix.marquer(["a", "b", "d"], "lu", true);
+  expect(lancer.mock.calls).toEqual([["lu", ["a", "b", "d"]]]);
+  expect(choisis(choix)).toEqual(["c"]);
+  expect(echecs(choix)).toBe(0);
+  retenue.resolve(["b", "d"]);
   await ecriture;
-  expect(actualiser).toHaveBeenCalledWith(["a", "b"], "lu");
-  expect([...choix.choisis()]).toEqual(["b"]);
-  expect(choix.echecs()).toBe(1);
-  expect(choix.enCours()).toBe(false);
-  await choix.marquer(["b"], "etoile", false);
-  expect(choix.echecs()).toBe(0);
-  expect([...choix.choisis()]).toEqual(["b"]);
-  await choix.marquer(["b"], "lu", false);
-  expect(choix.echecs()).toBe(1);
-  expect([...choix.choisis()]).toEqual(["b"]);
-  expect(actualiser).toHaveBeenCalledTimes(3);
+  expect(choisis(choix)).toEqual(["c", "b"]);
+  expect(echecs(choix)).toBe(2);
 });
 
-it("confirme plus de cent fils chargés en plusieurs requêtes", async () => {
-  const lots: string[][] = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (_url: string, options: RequestInit) => {
-      const { ids } = JSON.parse(String(options.body));
-      lots.push(ids);
-      return Response.json(ids.map((id: string) => ({ id, etat: "confirme" })));
-    }),
-  );
-  const choix = creerSelection(
-    "reception",
-    vi.fn(async () => {}),
-  );
-  const fils = Array.from({ length: 201 }, (_, n) => `fil-${n}`);
-  choix.cocher(fils, true);
-  await choix.marquer(fils, "lu", true);
-  expect(lots.map((lot) => lot.length)).toEqual([100, 100, 1]);
-  expect(lots.flat()).toEqual(fils);
-  expect(choix.echecs()).toBe(0);
-  expect(choix.choisis().size).toBe(0);
-  // Deux lots pleins : aucune requête vide ne part après le dernier.
-  lots.length = 0;
-  await choix.marquer(fils.slice(1), "etoile", true);
-  expect(lots.map((lot) => lot.length)).toEqual([100, 100]);
-  expect(choix.echecs()).toBe(0);
+it("additionne les refus des actions lancées depuis le dernier geste", async () => {
+  const premiere = reponseRetenue<string[]>();
+  const seconde = reponseRetenue<string[]>();
+  const lancer = vi
+    .fn()
+    .mockReturnValueOnce(Promise.resolve(["a"]))
+    .mockReturnValueOnce(premiere.promise)
+    .mockReturnValueOnce(seconde.promise);
+  const choix = creerSelection(lancer);
+  choix.cocher(["a", "b"], true);
+  flush();
+  await choix.marquer(["a"], "etoile", false);
+  expect(lancer.mock.calls).toEqual([["sans_etoile", ["a"]]]);
+  // L’étoile ne touche pas à la sélection.
+  expect(choisis(choix)).toEqual(["a", "b"]);
+  expect(echecs(choix)).toBe(1);
+  // Un nouveau geste efface l’annonce précédente.
+  const lue = choix.marquer(["a", "b"], "lu", false);
+  expect(echecs(choix)).toBe(0);
+  const etoilee = choix.marquer(["b"], "etoile", true);
+  expect(lancer.mock.calls.slice(1)).toEqual([
+    ["non_lu", ["a", "b"]],
+    ["etoile", ["b"]],
+  ]);
+  premiere.resolve(["a", "b"]);
+  await lue;
+  expect(echecs(choix)).toBe(2);
+  seconde.resolve(["b"]);
+  await etoilee;
+  expect(echecs(choix)).toBe(3);
+  expect(choisis(choix)).toEqual(["a", "b"]);
 });

@@ -49,7 +49,6 @@ function Ligne(props: {
           type="checkbox"
           aria-label={`${t("select")} ${objet()}`}
           checked={coche()}
-          disabled={props.selection.enCours()}
           onChange={(e) =>
             props.selection.cocher([props.fil.id], e.currentTarget.checked)
           }
@@ -75,6 +74,9 @@ function Ligne(props: {
         </span>
         <span class={styles.extrait}>{props.fil.extrait}</span>
         <span class={styles.indicateurs}>
+          <Show when={props.fil.attente?.lu}>
+            <span class={styles.attente}>{t("pending")}</span>
+          </Show>
           <For each={reperes}>
             {([champ, icone, libelle]) => (
               <Show when={props.fil[champ]}>
@@ -95,9 +97,9 @@ function Ligne(props: {
         type="button"
         class={styles.etoile}
         aria-label={t("star")}
-        aria-describedby={`objet-${props.fil.id}`}
+        aria-describedby={`objet-${props.fil.id} attente-${props.fil.id}`}
         aria-pressed={props.fil.etoile ? "true" : "false"}
-        disabled={props.selection.enCours()}
+        data-attente={props.fil.attente?.etoile ? "oui" : undefined}
         onClick={() =>
           void props.selection.marquer(
             [props.fil.id],
@@ -107,6 +109,11 @@ function Ligne(props: {
         }
       >
         <Icone nom="etoile" libelle={t("star")} />
+        <Show when={props.fil.attente?.etoile}>
+          <span id={`attente-${props.fil.id}`} class={styles.sr}>
+            {t("pending")}
+          </span>
+        </Show>
       </button>
     </li>
   );

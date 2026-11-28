@@ -328,10 +328,39 @@
   background: var(--commande);
 }
 .etoile {
+  position: relative;
   cursor: pointer;
   border: 0;
   background: transparent;
   color: var(--texte-secondaire);
+}
+/* Action envoyée mais pas encore confirmée : un pointillé, lisible sans la couleur. */
+.etoile:where([data-attente])::after {
+  content: "";
+  position: absolute;
+  inset: 0.45rem;
+  border: 2px dashed currentColor;
+  border-radius: 50%;
+  animation: attente 0.2s 0.4s both;
+}
+/* Hors du flux : la mention ne déplace ni l’objet ni la date de la ligne. */
+.attente {
+  position: absolute;
+  right: 100%;
+  margin-right: 0.25rem;
+  padding: 0 0.35rem;
+  border: 1px dashed currentColor;
+  border-radius: 0.7rem;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  background: var(--surface);
+  animation: attente 0.2s 0.4s both;
+}
+/* Une confirmation rapide ne fait pas clignoter le signe d’attente. */
+@keyframes attente {
+  from {
+    opacity: 0;
+  }
 }
 .etoile svg {
   width: 1.1rem;
@@ -401,6 +430,7 @@
   white-space: nowrap;
 }
 .indicateurs {
+  position: relative;
   grid-area: indicateurs;
   justify-content: flex-end;
   gap: 0.25rem;

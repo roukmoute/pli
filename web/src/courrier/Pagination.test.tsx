@@ -90,30 +90,42 @@ function ouvrir(reception: ReturnType<typeof boite>) {
       Response.json(reception.lire(url, { vue: "reception" })),
   );
   const requetes: string[] = [];
-  const fetchMock = vi.fn(async (adresse: RequestInfo | URL) => {
-    const url = new URL(String(adresse), "http://pli.test");
-    requetes.push(url.pathname.replace("/api/v1", "") + url.search);
-    switch (url.pathname) {
-      case "/api/v1/session":
-        return Response.json({
-          account_id: 3,
-          address: "noa@recette.test",
-          expires_at: Math.floor(Date.now() / 1000) + 300,
-        });
-      case "/api/v1/views/reception":
-        return lireReception(url);
-      case "/api/v1/folders":
-        return Response.json({
-          folders: [{ id: 8, path: "Études", role: null, hidden: false }],
-        });
-      case "/api/v1/folders/8/messages":
-        return Response.json(atelier.lire(url, { dossier: 8 }));
-      case "/api/v1/messages/flags":
-        return Response.json([]);
-      default:
-        throw new Error(`Route inattendue ${url}`);
-    }
-  });
+  const fetchMock = vi.fn(
+    async (adresse: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(adresse), "http://pli.test");
+      requetes.push(url.pathname.replace("/api/v1", "") + url.search);
+      switch (url.pathname) {
+        case "/api/v1/session":
+          return Response.json({
+            account_id: 3,
+            address: "noa@recette.test",
+            expires_at: Math.floor(Date.now() / 1000) + 300,
+          });
+        case "/api/v1/views/reception":
+          return lireReception(url);
+        case "/api/v1/folders":
+          return Response.json({
+            folders: [{ id: 8, path: "Études", role: null, hidden: false }],
+          });
+        case "/api/v1/folders/8/messages":
+          return Response.json(atelier.lire(url, { dossier: 8 }));
+        case "/api/v1/operations": {
+          const demande = JSON.parse(String(init?.body));
+          return Response.json({
+            ...demande,
+            etat: "confirmee",
+            revision: reception.etat.revision,
+            resultats: demande.cibles.map((id: string) => ({
+              id,
+              etat: "confirme",
+            })),
+          });
+        }
+        default:
+          throw new Error(`Route inattendue ${url}`);
+      }
+    },
+  );
   vi.stubGlobal("fetch", fetchMock);
   const view = render(() => <App />);
   const zone = () => view.getByRole("main");
@@ -282,7 +294,6 @@ async function recevoir(
   const etoile = view.getAllByRole<HTMLButtonElement>("button", {
     name: "Étoile",
   })[0];
-  await waitFor(() => expect(etoile.disabled).toBe(false));
   fireEvent.click(etoile);
   await view.findByRole("button", { name: new RegExp(arrivee.objet) });
 }

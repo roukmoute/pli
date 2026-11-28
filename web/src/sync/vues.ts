@@ -1,9 +1,11 @@
 import { creerArrivees, creerSuite, integrer, relire } from "./fenetre";
+import { conclureIndicateur, projeterAttentes } from "./indicateurs";
 import { appliquerLecture, creerLectures } from "./lecture";
+import { creerOperations, type TypeOperation } from "./operations";
 import { lireDossiers, lirePage, type Tranche } from "./pages-api";
 import { amorcerVue, projeterTri } from "./projection-tri";
 import { type Etat, ressource } from "./ressource";
-import { creerSelection, type Indicateur } from "./selection";
+import { creerSelection } from "./selection";
 import { creerTri } from "./tri";
 import type { IntentionTri } from "./tri-api";
 
@@ -22,6 +24,8 @@ export interface Fil {
   piece_jointe: boolean;
   repondu: boolean;
   transfere: boolean;
+  /** Posé par le navigateur tant que la messagerie n’a pas confirmé l’action. */
+  attente?: { etoile?: boolean; lu?: boolean };
 }
 
 export interface PageFils {
@@ -62,7 +66,7 @@ export interface Repere {
 function nouvelleVue(
   compte: number,
   vue: Vue,
-  actualiser: (ids: string[], indicateur: Indicateur) => Promise<void>,
+  lancer: (type: TypeOperation, cibles: string[]) => Promise<string[]>,
   afficher: (base: Etat<PageFils>) => Etat<PageFils>,
 ) {
   const repere: Repere = {
@@ -83,7 +87,7 @@ function nouvelleVue(
     charger: source.charger,
     etat,
     repere,
-    selection: creerSelection(vue, actualiser),
+    selection: creerSelection(lancer),
     suite: creerSuite(source, lire),
     arrivees: creerArrivees(etat),
   };
@@ -101,6 +105,9 @@ export function creerCourrier(compte: number) {
         entree.source.corriger((page) => appliquerLecture(page, vue, lecture));
     }
   });
+  const operations = creerOperations((operation, confirmees, revision) =>
+    conclureIndicateur(vues, lectures, operation, confirmees, revision),
+  );
 
   function estInbox(vue: Vue) {
     const liste = dossiers.etat();
@@ -154,36 +161,16 @@ export function creerCourrier(compte: number) {
         void entree.charger();
     }
   }
-  async function actualiser(
-    vueActive: Vue,
-    ids: string[],
-    indicateur: Indicateur,
-  ) {
-    const cibles = new Set(ids);
-    const requetes = [];
-    if (indicateur === "lu") requetes.push(lectures.actualiserFils(ids));
-    for (const [vue, entree] of vues) {
-      const etat = entree.source.etat();
-      if (
-        vue === vueActive ||
-        (etat.statut === "pret" &&
-          [...etat.valeur.nouveaux, ...etat.valeur.deja_vus].some((f) =>
-            cibles.has(f.id),
-          ))
-      ) {
-        requetes.push(entree.source.recharger());
-      }
-    }
-    await Promise.all(requetes);
-  }
   function obtenirVue(vue: Vue) {
     let entree = vues.get(vue);
     if (!entree) {
       entree = nouvelleVue(
         compte,
         vue,
-        (ids, indicateur) => actualiser(vue, ids, indicateur),
-        (etat) => afficher(vue, etat),
+        (type, cibles) => operations.lancer({ type, vue, cibles }),
+        // Les actions en attente se superposent à la page servie.
+        (etat) =>
+          projeterAttentes(afficher(vue, etat), vue, operations.enAttente()),
       );
       vues.set(vue, entree);
     }

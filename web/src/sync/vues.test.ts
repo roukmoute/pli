@@ -141,11 +141,14 @@ it("écarte les dossiers masqués et permet de reprendre un catalogue illisible"
   });
 });
 
-it("actualise la vue de l’action et les autres pages qui contiennent une cible", async () => {
+it("montre l’action avant la réponse puis relit les vues qui présentent la cible", async () => {
   const courrier = creerCourrier(5);
-  const source = vi.fn(async (url: string) => {
-    if (url.endsWith("/flags"))
-      return Response.json([{ id: "b", etat: "confirme" }]);
+  const b = fil("b", 10);
+  // Le serveur garde l’état du fil et confirme ou refuse chaque opération.
+  const serveur = { fil: b, etat: "confirme", revision: 4 };
+  const retenue = reponseRetenue<void>();
+  let reponse = retenue.promise;
+  const source = vi.fn(async (url: string, init: RequestInit) => {
     if (url.includes("/threads/")) return Response.json([]);
     if (url.includes("folders/"))
       return Response.json({
@@ -154,7 +157,25 @@ it("actualise la vue de l’action et les autres pages qui contiennent une cible
         dossier: 8,
         deja_vus: [{ id: "b" }],
       });
-    return Response.json({ ...premiere, vue: url.split("/").at(-1) });
+    if (!url.endsWith("/operations"))
+      return Response.json({
+        ...premiere,
+        vue: url.split("/").at(-1),
+        nouveaux: url.endsWith("/reception") ? [serveur.fil] : [],
+        revision: serveur.revision,
+      });
+    await reponse;
+    const demande = JSON.parse(String(init.body));
+    if (serveur.etat === "confirme") {
+      serveur.fil = { ...serveur.fil, etoile: demande.type === "etoile" };
+      serveur.revision++;
+    }
+    return Response.json({
+      ...demande,
+      etat: serveur.etat === "confirme" ? "confirmee" : "refusee",
+      revision: serveur.revision,
+      resultats: [{ id: "b", etat: serveur.etat }],
+    });
   });
   vi.stubGlobal("fetch", source);
   const entree = courrier.obtenirVue("reception");
@@ -165,19 +186,43 @@ it("actualise la vue de l’action et les autres pages qui contiennent une cible
   ]);
   courrier.obtenirVue("justificatifs");
   const fermer = courrier.lectures.consulter("b");
+  const affiche = () => {
+    flush();
+    const etat = entree.etat();
+    return etat.statut === "pret" ? etat.valeur.nouveaux[0] : undefined;
+  };
+  const appels = () => source.mock.calls.map(([url]) => url).sort();
   source.mockClear();
-  await entree.selection.marquer(["b"], "lu", false);
-  expect(source.mock.calls.map(([url]) => url).sort()).toEqual([
+  const etoilee = entree.selection.marquer(["b"], "etoile", true);
+  // Avant toute réponse, la liste montre l’étoile et son attente.
+  expect(affiche()).toEqual({ ...b, etoile: true, attente: { etoile: true } });
+  // Le cache, lui, attend la confirmation.
+  expect(entree.source.valeur()?.nouveaux[0]).toEqual(b);
+  expect(appels()).toEqual(["/api/v1/operations"]);
+  retenue.resolve();
+  await etoilee;
+  expect(affiche()).toEqual({ ...b, etoile: true });
+  expect(appels()).toEqual([
     "/api/v1/folders/8/messages",
-    "/api/v1/messages/flags",
-    "/api/v1/threads/b",
+    "/api/v1/operations",
     "/api/v1/views/reception",
   ]);
+  expect(JSON.parse(String(source.mock.calls[0][1].body))).toMatchObject({
+    type: "etoile",
+    vue: "reception",
+    cibles: ["b"],
+  });
+  // Un refus rend l’état d’avant et s’annonce dans la sélection.
+  serveur.etat = "refuse";
+  reponse = Promise.resolve();
   source.mockClear();
-  await entree.selection.marquer(["b"], "etoile", true);
-  expect(source.mock.calls.map(([url]) => url).sort()).toEqual([
+  await entree.selection.marquer(["b"], "lu", true);
+  expect(affiche()).toEqual({ ...b, etoile: true });
+  expect(entree.selection.echecs()).toBe(1);
+  expect(appels()).toEqual([
     "/api/v1/folders/8/messages",
-    "/api/v1/messages/flags",
+    "/api/v1/operations",
+    "/api/v1/threads/b",
     "/api/v1/views/reception",
   ]);
   fermer();

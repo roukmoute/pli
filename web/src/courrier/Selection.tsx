@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import { flush, Show } from "solid-js";
 import { t } from "../i18n";
 import type { Selection } from "../sync/selection";
 import styles from "./courrier.module.css";
@@ -9,8 +9,10 @@ export function BarreSelection(props: { ids: string[]; selection: Selection }) {
   const nombre = () => lot().length;
   const total = () => props.ids.length;
   let controlePage!: HTMLInputElement;
-  async function marquer(valeur: boolean, bouton: HTMLButtonElement) {
-    await selection.marquer(lot(), "lu", valeur);
+  function marquer(valeur: boolean, bouton: HTMLButtonElement) {
+    void selection.marquer(lot(), "lu", valeur);
+    // Le lot quitte la sélection dès le geste et ses commandes disparaissent avec lui.
+    flush();
     if (!bouton.isConnected && document.activeElement === document.body)
       controlePage.focus({ preventScroll: true });
   }
@@ -23,7 +25,6 @@ export function BarreSelection(props: { ids: string[]; selection: Selection }) {
             type="checkbox"
             checked={nombre() === total()}
             prop:indeterminate={nombre() > 0 && nombre() < total()}
-            disabled={selection.enCours()}
             onChange={(e) =>
               selection.cocher(props.ids, e.currentTarget.checked)
             }
@@ -41,16 +42,14 @@ export function BarreSelection(props: { ids: string[]; selection: Selection }) {
         <button
           class={styles.boutonLot}
           type="button"
-          disabled={selection.enCours()}
-          onClick={(e) => void marquer(true, e.currentTarget)}
+          onClick={(e) => marquer(true, e.currentTarget)}
         >
           {t("markRead")}
         </button>
         <button
           class={styles.boutonLot}
           type="button"
-          disabled={selection.enCours()}
-          onClick={(e) => void marquer(false, e.currentTarget)}
+          onClick={(e) => marquer(false, e.currentTarget)}
         >
           {t("markUnread")}
         </button>
