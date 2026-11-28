@@ -4,6 +4,7 @@ use reqwest::{Client, RequestBuilder, StatusCode};
 use serde_json::Value;
 
 use crate::{Error, Example};
+mod archivage;
 mod decisions;
 mod folders;
 mod lecture;
@@ -121,7 +122,8 @@ impl World {
             || self.page_step(text, example).await?
             || self.navigation_step(text, example).await?
             || self.decisions_step(text, example).await?
-            || self.lecture_step(text, example).await?)
+            || self.lecture_step(text, example).await?
+            || self.archivage_step(text, example).await?)
     }
 }
 

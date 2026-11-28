@@ -1,4 +1,5 @@
-"""Recette APS sur une boîte GreenMail jetable. Suspend un lot IMAP après sa première réponse."""
+"""Recette APS sur une boîte GreenMail jetable. Suspend un lot IMAP après sa première réponse,
+ou laisse sur place une lettre du premier archivage."""
 
 import asyncio
 import imaplib
@@ -64,11 +65,24 @@ async def forward_commands(reader, writer):
         await writer.drain()
 
 
-async def serve(directory, pages=False, *, address=None, subjects=None):
+def creer_archives(address):
+    with imaplib.IMAP4_SSL(HOST, IMAPS, ssl_context=tls_client(), timeout=8) as mailbox:
+        mailbox.login(address, address)
+        for command in (mailbox.create, mailbox.subscribe):
+            status, _ = command("Archives")
+            if status != "OK":
+                raise RuntimeError("Création du dossier Archives refusée.")
+
+
+async def serve(directory, pages=False, *, address=None, subjects=None, archives=False):
     address = address or f"tri-{uuid4().hex}@recette.test"
+    if subjects is None and archives:
+        subjects = ["Fil A", "Fil B", "Fil C"]
     if subjects is None:
         subjects = [f"Archive {uid}" for uid in range(1, 52)] if pages else ["Archive A", "Archive B"]
     deliver(address, subjects)
+    if archives:
+        creer_archives(address)
     key, cert = (directory / name for name in ("banc.key", "banc.pem"))
     subprocess.run(
         ["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
@@ -85,7 +99,7 @@ async def serve(directory, pages=False, *, address=None, subjects=None):
         while line := await reader.readline():
             if re.match(rb"^\* \d+ FETCH \(", line):
                 fetched += 1
-                if not pages and fetched == 2 and not paused:
+                if not pages and not archives and fetched == 2 and not paused:
                     paused = True
                     await asyncio.to_thread(deliver, address, ["Arrivée A", "Arrivée B"])
                     print("livré", flush=True)
@@ -105,9 +119,20 @@ async def serve(directory, pages=False, *, address=None, subjects=None):
             writer.write(line)
             await writer.drain()
 
+    async def archive_commands(reader, writer):
+        nonlocal paused
+        while line := await reader.readline():
+            if not paused:
+                # Le premier déplacement de plusieurs lettres laisse la dernière sur place.
+                shortened = re.sub(rb"(UID MOVE [\d,]+),\d+ ", rb"\1 ", line, flags=re.I)
+                paused = shortened != line
+                line = shortened
+            writer.write(line)
+            await writer.drain()
+
     async def relay(client, downstream):
         remote, upstream = await asyncio.open_connection(HOST, IMAPS, ssl=tls_client())
-        commands = page_commands if pages else forward_commands
+        commands = page_commands if pages else archive_commands if archives else forward_commands
         tasks = [asyncio.create_task(commands(client, upstream)),
                  asyncio.create_task(replies(remote, downstream))]
         try:
@@ -128,4 +153,5 @@ if __name__ == "__main__":
     if sys.argv[1] == "--unread":
         print(unread(sys.argv[2]))
     else:
-        asyncio.run(serve(Path(sys.argv[1]), "--pages" in sys.argv[2:]))
+        options = sys.argv[2:]
+        asyncio.run(serve(Path(sys.argv[1]), "--pages" in options, archives="--archivage" in options))
