@@ -66,3 +66,22 @@ it("additionne les refus des actions lancées depuis le dernier geste", async ()
   expect(echecs(choix)).toBe(3);
   expect(choisis(choix)).toEqual(["a", "b"]);
 });
+
+it("retire les fils archivés de la sélection et n’y ramène que les fils refusés", async () => {
+  const retenue = reponseRetenue<string[]>();
+  const lancer = vi.fn(() => retenue.promise);
+  const choix = creerSelection(lancer);
+  choix.cocher(["a", "b", "c"], true);
+  flush();
+  await choix.archiver([]);
+  expect(lancer).not.toHaveBeenCalled();
+  const ecriture = choix.archiver(["a", "b", "d"]);
+  expect(lancer.mock.calls).toEqual([["archiver", ["a", "b", "d"]]]);
+  expect(choisis(choix)).toEqual(["c"]);
+  expect(echecs(choix)).toBe(0);
+  retenue.resolve(["b", "d"]);
+  await ecriture;
+  // Le fil d n’était pas coché : refusé, il est proposé à la reprise comme b.
+  expect(choisis(choix)).toEqual(["c", "b", "d"]);
+  expect(echecs(choix)).toBe(2);
+});

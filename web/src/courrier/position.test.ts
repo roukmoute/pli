@@ -165,3 +165,41 @@ it("remonte en haut de liste et place le focus sur sa première ligne", () => {
   viserDebut(zone);
   expect(zone.scrollTop).toBe(0);
 });
+
+it("reprend sur la ligne la plus proche d’une section vidée, puis sur le titre d’une liste vide", () => {
+  const zone = document.createElement("main");
+  zone.innerHTML = `<h1 tabindex="-1">Réception</h1>
+    <section data-section="nouveaux"><button data-fil="a"></button><button data-fil="b"></button><button data-fil="c"></button></section>
+    <section data-section="deja_vus"><button data-fil="d"></button><button data-fil="e"></button></section>`;
+  const [a, b, c, d, e] = Array.from(zone.querySelectorAll("button"));
+  const titre = zone.querySelector("h1") as HTMLElement;
+  const focus = [a, b, c, d, e, titre].map((cible) => vi.spyOn(cible, "focus"));
+  const recu = () => focus.map((espion) => espion.mock.calls.length);
+  const repere: Repere = {
+    defilement: 0,
+    section: "deja_vus",
+    ordre: "date",
+    filtre: "tous",
+    fil: "archivé",
+  };
+  // « Déjà vus » s’est vidé : la dernière ligne de « Nouveaux » est juste au-dessus.
+  d.remove();
+  e.remove();
+  restaurerPosition(zone, repere);
+  expect(recu()).toEqual([0, 0, 1, 0, 0, 0]);
+  expect(focus[2]).toHaveBeenCalledWith({ preventScroll: true });
+  // « Nouveaux » s’est vidé : la première ligne de « Déjà vus » est juste en dessous.
+  zone.querySelector("[data-section=deja_vus]")?.append(d, e);
+  for (const ligne of [a, b, c]) ligne.remove();
+  repere.section = "nouveaux";
+  restaurerPosition(zone, repere);
+  expect(recu()).toEqual([0, 0, 1, 1, 0, 0]);
+  // Plus aucune ligne : le titre de la liste reçoit le focus.
+  d.remove();
+  e.remove();
+  restaurerPosition(zone, repere);
+  expect(recu()).toEqual([0, 0, 1, 1, 0, 1]);
+  expect(focus[5]).toHaveBeenCalledWith({ preventScroll: true });
+  titre.remove();
+  expect(() => restaurerPosition(zone, repere)).not.toThrow();
+});

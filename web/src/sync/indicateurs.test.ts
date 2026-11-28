@@ -1,8 +1,8 @@
 import { expect, it, vi } from "vitest";
 import { fil, ids, page } from "../../tests/fils";
+import { projeterAttentes } from "./effets";
 import {
   conclureIndicateur,
-  projeterAttentes,
   projeterIndicateur,
   typeOperation,
 } from "./indicateurs";

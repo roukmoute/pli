@@ -49,7 +49,14 @@ export function restaurerPosition(zone: HTMLElement, repere: Repere) {
         repere.ancre.decalage;
     }
   }
-  if (repere.fil) retrouver(repere.fil)?.focus({ preventScroll: true });
+  if (repere.fil) {
+    // Section vidée : la ligne la plus proche dans l’autre. Liste vidée : son titre.
+    const voisine =
+      repere.section === "nouveaux" ? presentes[0] : presentes.at(-1);
+    const cible =
+      retrouver(repere.fil) || voisine || zone.querySelector<HTMLElement>("h1");
+    cible?.focus({ preventScroll: true });
+  }
   delete repere.lecture;
 }
 

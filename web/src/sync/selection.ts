@@ -20,26 +20,30 @@ export function creerSelection(lancer: Lancer) {
     });
   }
 
-  async function marquer(
-    ids: string[],
-    indicateur: Indicateur,
-    valeur: boolean,
-  ) {
+  // Le lot quitte la sélection dès le geste. Les fils refusés y reviennent pour réessayer.
+  async function executer(type: TypeOperation, ids: string[], lot: string[]) {
     if (!ids.length) return;
     signaler(0);
-    // Un lot marqué quitte la sélection dès le geste. Un refus l’y ramène pour réessayer.
-    const lot =
-      indicateur === "lu" ? ids.filter((id) => choisis().has(id)) : [];
     cocher(lot, false);
-    const refuses = new Set(
-      await lancer(typeOperation(indicateur, valeur), ids),
-    );
+    const refuses = new Set(await lancer(type, ids));
     cocher(
       lot.filter((id) => refuses.has(id)),
       true,
     );
     signaler((nombre) => nombre + refuses.size);
   }
-  return { choisis, cocher, marquer, echecs };
+
+  function marquer(ids: string[], indicateur: Indicateur, valeur: boolean) {
+    // L’étoile ne touche pas à la sélection.
+    const lot =
+      indicateur === "lu" ? ids.filter((id) => choisis().has(id)) : [];
+    return executer(typeOperation(indicateur, valeur), ids, lot);
+  }
+
+  /** Les fils archivés partent avec leur coche. Seuls les fils refusés sont proposés à la reprise. */
+  function archiver(ids: string[]) {
+    return executer("archiver", ids, ids);
+  }
+  return { choisis, cocher, marquer, archiver, echecs };
 }
 export type Selection = ReturnType<typeof creerSelection>;

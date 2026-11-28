@@ -10,6 +10,7 @@ import {
   creerCourrier,
   type Vue,
 } from "../sync";
+import { ChoixArchives } from "./Archives";
 import styles from "./courrier.module.css";
 import EcranFil from "./Fil";
 import { Liste } from "./Liste";
@@ -22,6 +23,8 @@ interface Props {
   textes: Labels;
   fermer: (bouton: HTMLButtonElement) => Promise<void>;
   echec: boolean;
+  /** Ouvre le fil suivant après une action sur le fil ouvert. Attend son réglage. */
+  lectureEnSerie?: boolean;
 }
 
 function Dossier(props: { cache: CacheCourrier }) {
@@ -137,12 +140,20 @@ function Barre(props: Props & { cache: CacheCourrier; children: JSX.Element }) {
       <Show when={menu()}>
         <Menu courrier={props.cache} fermer={fermerMenu} />
       </Show>
+      <Show when={props.cache.archives.demande()}>
+        {(demande) => (
+          <ChoixArchives
+            archives={props.cache.archives}
+            lancer={demande().lancer}
+          />
+        )}
+      </Show>
     </div>
   );
 }
 
 export default function Courrier(props: Props) {
-  const cache = creerCourrier(props.compte);
+  const cache = creerCourrier(props.compte, props.lectureEnSerie);
   const liste = (vue: Vue, titre: () => string) => () => (
     <Liste courrier={cache} vue={vue} titre={titre()} />
   );
@@ -155,7 +166,7 @@ export default function Courrier(props: Props) {
       { path: "/flux", component: liste("flux", () => t("feed")) },
       {
         path: ["/fil/:fil", "/fil/:fil/message/:id"],
-        component: () => <EcranFil cache={cache.lectures} />,
+        component: () => <EcranFil courrier={cache} />,
       },
       {
         path: "/nouveaux-expediteurs",

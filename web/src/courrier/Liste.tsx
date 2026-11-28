@@ -166,6 +166,7 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
     return e.statut === "pret" && e.perime;
   };
   let zone!: HTMLElement;
+  let titre!: HTMLHeadingElement;
   let actualisee = false;
   const defilement = suivreDefilement(
     entree,
@@ -222,7 +223,9 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
       <div class={styles.colonne}>
         <Nouveautes nombre={entree.arrivees.nombre()} voir={defilement.debut} />
         <header class={styles.enteteListe}>
-          <h1>{props.titre}</h1>
+          <h1 ref={titre} tabindex="-1">
+            {props.titre}
+          </h1>
           <a href="/ecrire" class={styles.ecrire} aria-label={t("compose")}>
             <Icone nom="ecrire" libelle={t("compose")} />
             {t("compose")}
@@ -259,6 +262,10 @@ export function Liste(props: { vue: Vue; titre: string; courrier: Courrier }) {
                     (f) => f.id,
                   )}
                   selection={entree.selection}
+                  archives={props.courrier.archives}
+                  archivable={!props.courrier.archives.recoit(props.vue)}
+                  enPartance={entree.enPartance()}
+                  titre={titre}
                 />
                 <For each={["nouveaux", "deja_vus"] as const}>
                   {(section) => (

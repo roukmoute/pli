@@ -68,6 +68,16 @@ export const fr = {
   forward: "Transférer",
   more: "Plus",
   archive: "Archiver",
+  archiveSelection: "Archiver la sélection",
+  archiveThread: "Archiver le fil",
+  archiveMessage: "Archiver le message",
+  archivePending: "Archivage en attente pour",
+  archiveDestination: "Dossier des archives",
+  archiveDestinationHelp:
+    "Cette messagerie n’annonce aucun dossier d’archives. Le dossier choisi recevra les archives de ce compte.",
+  archiveNoFolder:
+    "Aucun dossier personnel ne peut recevoir les archives. Créez-en un dans votre messagerie, puis réessayez.",
+  archiveDestinationError: "Ce dossier n’a pas pu être retenu.",
   move: "Déplacer",
   copy: "Copier",
   delete: "Supprimer",

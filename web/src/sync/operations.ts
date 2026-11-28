@@ -1,7 +1,12 @@
 import { createSignal } from "solid-js";
 import { ApiError, request } from "./api";
 
-export type TypeOperation = "etoile" | "sans_etoile" | "lu" | "non_lu";
+export type TypeOperation =
+  | "etoile"
+  | "sans_etoile"
+  | "lu"
+  | "non_lu"
+  | "archiver";
 type EtatCible = "en_attente" | "confirme" | "partiel" | "refuse" | "absent";
 
 export interface Operation {

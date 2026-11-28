@@ -1,3 +1,40 @@
+.choix {
+  width: min(26rem, calc(100% - 2rem));
+  box-sizing: border-box;
+  padding: 1.25rem;
+  background: var(--surface);
+  color: var(--texte);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon-surface);
+  box-shadow: 0 1rem 3rem #24223724;
+}
+.choix h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.choix ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.choix button {
+  min-height: var(--cible-tactile);
+  padding-inline: 0.75rem;
+  border: 1px solid var(--bord-controle);
+  border-radius: var(--rayon-controle);
+  background: var(--surface);
+  color: var(--commande);
+  cursor: pointer;
+}
+.choixDossier {
+  width: 100%;
+  text-align: start;
+}
+.choix [role="alert"] {
+  color: var(--erreur);
+}
 .application {
   height: 100dvh;
   display: flex;
@@ -400,6 +437,18 @@
 .selection [role="alert"] {
   color: var(--erreur);
 }
+.partance {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px dashed currentColor;
+  border-radius: 0.7rem;
+  white-space: nowrap;
+  animation: attente 0.2s 0.4s both;
+}
+.enteteListe h1:focus-visible {
+  outline: var(--contour-selection);
+  outline-offset: 0.2rem;
+}
 .correspondant,
 .objet,
 .extrait {
@@ -462,7 +511,8 @@
   border-radius: var(--rayon-surface);
   box-shadow: 0 1rem 3rem #24223724;
 }
-.menu::backdrop {
+.menu::backdrop,
+.choix::backdrop {
   background: #24223740;
 }
 .rechercheMenu {

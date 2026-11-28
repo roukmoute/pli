@@ -1,0 +1,50 @@
+{
+  "inbox": {
+    "id": 1,
+    "path": "INBOX",
+    "delimiter": "/",
+    "role": "inbox",
+    "hidden": false,
+    "selectable": true
+  },
+  "atelier": {
+    "id": 2,
+    "path": "Atelier",
+    "delimiter": "/",
+    "role": null,
+    "hidden": false,
+    "selectable": true
+  },
+  "classement": {
+    "id": 5,
+    "path": "Classement",
+    "delimiter": "/",
+    "role": null,
+    "hidden": false,
+    "selectable": false
+  },
+  "envoyes": {
+    "id": 6,
+    "path": "Envoyés",
+    "delimiter": "/",
+    "role": "sent",
+    "hidden": false,
+    "selectable": true
+  },
+  "archives": {
+    "id": 7,
+    "path": "Archives",
+    "delimiter": "/",
+    "role": "archive",
+    "hidden": false,
+    "selectable": true
+  },
+  "masque": {
+    "id": 9,
+    "path": "Masqué",
+    "delimiter": "/",
+    "role": null,
+    "hidden": true,
+    "selectable": true
+  }
+}

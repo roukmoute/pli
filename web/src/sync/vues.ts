@@ -1,5 +1,7 @@
+import { filsEnPartance } from "./archivage";
+import { creerArchives } from "./archives";
+import { conclureOperation, projeterAttentes } from "./effets";
 import { creerArrivees, creerSuite, integrer, relire } from "./fenetre";
-import { conclureIndicateur, projeterAttentes } from "./indicateurs";
 import { appliquerLecture, creerLectures } from "./lecture";
 import { creerOperations, type TypeOperation } from "./operations";
 import { lireDossiers, lirePage, type Tranche } from "./pages-api";
@@ -47,6 +49,8 @@ export interface Dossier {
   delimiter: string | null;
   role: "inbox" | "sent" | "drafts" | "junk" | "trash" | "archive" | null;
   hidden: boolean;
+  /** Faux pour un dossier qui ne contient que d’autres dossiers. */
+  selectable: boolean;
 }
 
 // L’API sert aujourd’hui un seul ordre et une liste entière.
@@ -68,6 +72,7 @@ function nouvelleVue(
   vue: Vue,
   lancer: (type: TypeOperation, cibles: string[]) => Promise<string[]>,
   afficher: (base: Etat<PageFils>) => Etat<PageFils>,
+  enPartance: () => number,
 ) {
   const repere: Repere = {
     defilement: 0,
@@ -90,14 +95,17 @@ function nouvelleVue(
     selection: creerSelection(lancer),
     suite: creerSuite(source, lire),
     arrivees: creerArrivees(etat),
+    enPartance,
   };
 }
 export type VueCourrier = ReturnType<typeof nouvelleVue>;
 
 // Le cache et les opérations de tri appartiennent à la session affichée.
-export function creerCourrier(compte: number) {
+// La lecture en série attend son réglage : elle reste éteinte par défaut.
+export function creerCourrier(compte: number, lectureEnSerie = false) {
   const vues = new Map<Vue, ReturnType<typeof nouvelleVue>>();
   const dossiers = ressource(lireDossiers);
+  const archives = creerArchives(dossiers);
   const tri = creerTri(compte, confirmer);
   const lectures = creerLectures((lecture) => {
     for (const [vue, entree] of vues) {
@@ -106,7 +114,7 @@ export function creerCourrier(compte: number) {
     }
   });
   const operations = creerOperations((operation, confirmees, revision) =>
-    conclureIndicateur(vues, lectures, operation, confirmees, revision),
+    conclureOperation(vues, lectures, operation, confirmees, revision),
   );
 
   function estInbox(vue: Vue) {
@@ -171,6 +179,7 @@ export function creerCourrier(compte: number) {
         // Les actions en attente se superposent à la page servie.
         (etat) =>
           projeterAttentes(afficher(vue, etat), vue, operations.enAttente()),
+        () => filsEnPartance(operations.enAttente(), vue),
       );
       vues.set(vue, entree);
     }
@@ -178,7 +187,9 @@ export function creerCourrier(compte: number) {
   }
   return {
     dossiers,
+    archives,
     lectures,
+    lectureEnSerie,
     tri,
     obtenirVue,
     chargerVue: (vue: Vue) => obtenirVue(vue).charger(),

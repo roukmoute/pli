@@ -1,7 +1,7 @@
 import type { Lectures } from "./lecture";
 import type { EnAttente, Intention, TypeOperation } from "./operations";
 import { comparerFils } from "./projection-tri";
-import type { Etat, ressource } from "./ressource";
+import type { ressource } from "./ressource";
 import type { Fil, PageFils } from "./vues";
 
 export type Indicateur = "lu" | "etoile";
@@ -50,22 +50,6 @@ export function projeterIndicateur(
     ...page,
     nouveaux: fils.filter((fil) => fil.non_lu).sort(comparerFils),
     deja_vus: fils.filter((fil) => !fil.non_lu).sort(comparerFils),
-  };
-}
-
-/** Superpose à la page servie les actions que la messagerie n’a pas encore confirmées. */
-export function projeterAttentes(
-  etat: Etat<PageFils>,
-  vue: string,
-  attentes: readonly EnAttente[],
-): Etat<PageFils> {
-  if (etat.statut !== "pret" || !attentes.length) return etat;
-  return {
-    ...etat,
-    valeur: attentes.reduce(
-      (page, operation) => projeterIndicateur(page, vue, operation, true),
-      etat.valeur,
-    ),
   };
 }
 
