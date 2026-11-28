@@ -28,7 +28,6 @@ pub(crate) fn router(lecteur: Lecteur) -> Router<Arc<Database>> {
         .route("/v1/threads/{id}", get(fil))
         .route("/v1/messages/{id}", get(contenu))
         .route("/v1/messages/{id}/open", post(ouvrir))
-        .route("/v1/messages/flags", post(indicateurs::modifier))
         .route("/v1/messages/{id}/images/{partie}", get(image))
         .layer(Extension(lecteur))
 }
