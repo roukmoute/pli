@@ -6,13 +6,22 @@ use super::{
 
 const ARCHIVAGE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/archivage.mjs");
 const CORBEILLE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/corbeille.mjs");
+const RANGEMENT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/rangement.mjs");
 const BOITE: &str =
     "une boîte dont la messagerie laisse une lettre sur place au premier archivage est rattachée";
 const GESTE: &str =
     "j’archive deux fils sélectionnés après avoir consulté le premier dans le navigateur";
 const VIDAGE: &str = "je supprime, restaure puis vide la corbeille dans le navigateur";
+// Chaque parcours du navigateur et sa sonde.
+const PARCOURS: [(&str, &str); 2] = [
+    (VIDAGE, CORBEILLE),
+    (
+        "je déplace et copie des fils par le menu puis par le glisser dans le navigateur",
+        RANGEMENT,
+    ),
+];
 // Début et fin de chaque étape, autour de la valeur attendue, et mesure rendue par la sonde.
-const MESURES: [(&str, &str, &str); 14] = [
+const MESURES: [(&str, &str, &str); 19] = [
     ("la liste perd ", " fils avant toute réponse", "immediats"),
     (
         "le fil consulté reste avec ",
@@ -63,6 +72,31 @@ const MESURES: [(&str, &str, &str); 14] = [
         " lettre dans la corbeille",
         "videe",
     ),
+    (
+        "le menu et le glisser produisent ",
+        " même opération sur leur lot",
+        "memes",
+    ),
+    (
+        "la copie laisse le fil dans ",
+        " dossiers de la boîte",
+        "copies",
+    ),
+    (
+        "le dossier disparu est annoncé pour ",
+        " fil en attente d’un autre choix",
+        "annonces",
+    ),
+    (
+        "le sélecteur propose ",
+        " dossier d’un autre compte",
+        "etrangers",
+    ),
+    (
+        "le dernier choix porte à ",
+        " le nombre de lettres du dossier",
+        "ranges",
+    ),
 ];
 
 impl World {
@@ -86,9 +120,11 @@ impl World {
             self.lecture = observer(&mut sonde).await?;
             return Ok(true);
         }
-        if texte == VIDAGE {
-            self.lecture = observer(&mut commande_navigation(CORBEILLE, self.address)).await?;
-            return Ok(true);
+        for (parcours, sonde) in PARCOURS {
+            if texte == parcours {
+                self.lecture = observer(&mut commande_navigation(sonde, self.address)).await?;
+                return Ok(true);
+            }
         }
         for (debut, fin, mesure) in MESURES {
             if let Some(cle) = texte.strip_suffix(fin).and_then(|s| parameter(s, debut)) {
