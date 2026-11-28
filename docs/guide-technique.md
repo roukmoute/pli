@@ -55,6 +55,7 @@ Depuis la racine, `make test` prépare les dépendances et lance les deux suites
 | `WEBMAIL_ALLOW_TEST_PROFILE` | `0` | La valeur `1` autorise le profil GreenMail local avec certificat de test sur une IP de bouclage. |
 | `WEBMAIL_SECRET_KEY` | vide | Clé de 32 octets encodée en 64 chiffres hexadécimaux, requise pour ouvrir une session de courrier. Générez-la une fois avec `openssl rand -hex 32` et conservez-la dans la configuration privée de l’instance. |
 | `WEBMAIL_SESSION_TTL_SECONDS` | `28800` | Durée d’une session en secondes à compter de la connexion, soit huit heures par défaut. |
+| `WEBMAIL_PAGE_SIZE` | `20` | Nombre de fils d’une page de liste, de 1 à 100, quand la requête ne précise pas `taille`. L’import IMAP garde ses lots de 50 en-têtes. |
 
 Sur `/admin`, ouvrez l’administration puis choisissez **Ajouter un serveur**. Renseignez les hôtes IMAP et SMTP, les ports, les modes TLS et les domaines de votre service de messagerie. Le banc local propose IMAPS 3993 et SMTPS 3465. Les ports sont modifiables.
 
@@ -90,7 +91,7 @@ Lorsque le serveur annonce `SPECIAL-USE`, ses attributs déterminent les rôles 
 
 Le synchroniseur importe jusqu’à 50 en-têtes par lot, en commençant par les UID les plus récents. Pendant l’import, une seconde connexion vérifie INBOX toutes les cinq secondes. Le serveur conserve un extrait de la partie textuelle et lit les dossiers en lecture seule.
 
-Les listes de fils sont disponibles sur `GET /api/v1/views/reception`, `/api/v1/views/flux`, `/api/v1/views/justificatifs` et `GET /api/v1/folders/{id}/messages`. Le paramètre `taille` accepte de 1 à 100 fils et vaut 20 par défaut. Pour continuer, transmettez `curseur_suivant` dans le paramètre `curseur` de la même liste. Une fin de liste renvoie `null`. La date de réception et l’identifiant stable du fil déterminent l’ordre entre les pages.
+Les listes de fils sont disponibles sur `GET /api/v1/views/reception`, `/api/v1/views/flux`, `/api/v1/views/justificatifs` et `GET /api/v1/folders/{id}/messages`. Le paramètre `taille` accepte de 1 à 100 fils. Sans lui, la page suit le réglage `WEBMAIL_PAGE_SIZE`. Pour continuer, transmettez `curseur_suivant` dans le paramètre `curseur` de la même liste. Une fin de liste renvoie `null`. La date de réception et l’identifiant stable du fil déterminent l’ordre entre les pages.
 
 `nouveaux` contient les fils avec au moins une lettre admise non lue. `deja_vus` contient les autres fils. Chaque résumé donne l’expéditeur, l’objet et l’extrait de sa dernière lettre visible, puis les indicateurs et le nombre de lettres du fil. `compteurs` compte les fils de chaque destination. `expediteurs_en_attente` compte les adresses distinctes à trier. La réponse fournit la révision de cette photographie SQLite. Les lectures HTTP utilisent l’index local pendant que le synchroniseur traite les prochains lots IMAP.
 
@@ -102,11 +103,17 @@ La recette manuelle compare l’import des en-têtes, la lecture des corps et le
 
 La session ouvre Réception. Le menu permet de rejoindre Flux, Justificatifs ou un dossier du compte. La touche H ouvre le menu et Échap rend le focus à son bouton. Le champ de recherche du menu reconnaît les noms accentués. Chaque vue garde sa dernière page en mémoire pendant la session, avec le fil au focus, la section et l’ancre de défilement. Au retour, SolidJS affiche cette page pendant qu’une requête actualise son contenu. Les URL peuvent être rechargées directement, y compris `/dossier/{id}`.
 
-Dans la liste, un clic sur l’objet ou la touche Entrée ouvre le fil. L’avatar est une case à cocher, utilisable avec Espace. « Sélectionner la page » agit sur les fils affichés dans les deux sections. La coche, le contour et le compteur indiquent la sélection. Chaque vue conserve ses propres choix. Après « Marquer comme lu » ou « Marquer comme non lu », les fils confirmés quittent la sélection. Les autres peuvent être réessayés. L’étoile agit sur sa ligne.
+La liste demande la page suivante quand il reste moins de 600 pixels sous la zone visible. « Afficher les fils suivants » fait la même demande au clavier et sert à réessayer après une coupure. Les pages s’ajoutent par identifiant de fil, dans l’ordre du serveur, et chaque vue les garde en mémoire avec sa section, son ancre et sa ligne au focus. Une actualisation relit toutes les pages chargées. La première requête suit la taille réglée et les suivantes demandent les lignes restantes, par tranches de 100 au plus.
+
+Quand la liste change sous un lecteur qui a défilé, la ligne sous le pointeur garde sa place, ou à défaut la première ligne visible. Un fil plus récent que le dernier courrier vu en haut de liste fait apparaître « Nouveautés » avec leur nombre. Cette commande remonte en haut et place le focus sur la première ligne. En haut de liste, le courrier arrivé s’affiche directement.
+
+Dans la liste, un clic sur l’objet ou la touche Entrée ouvre le fil. L’avatar est une case à cocher, utilisable avec Espace. « Sélectionner la page » agit sur les fils affichés dans les deux sections. La coche, le contour et le compteur indiquent la sélection. Chaque vue conserve ses propres choix. « Sélectionner la page » couvre toutes les pages chargées, et le navigateur envoie les lots de plus de 100 fils en plusieurs requêtes. Après « Marquer comme lu » ou « Marquer comme non lu », les fils confirmés quittent la sélection. Les autres peuvent être réessayés. L’étoile agit sur sa ligne.
 
 `POST /api/v1/messages/flags` accepte de 1 à 100 identifiants. Avec `vue`, les identifiants désignent les fils de cette vue et l’action couvre leurs messages visibles dans cette vue. Sans ce champ, fournissez des identifiants de messages obtenus avec `GET /api/v1/threads/{id}`. Par exemple, `{"ids":["1-1-3","1-1-4"],"indicateur":"lu","valeur":false}` marque ces deux messages non lus. L’indicateur `etoile` utilise le même format. La réponse contient un couple `id` et `etat` par entrée, dans l’ordre de la demande. Les états sont `confirme`, `partiel`, `non_confirme` et `absent`. Un identifiant d’une autre boîte reçoit le même résultat qu’un identifiant inconnu.
 
 Le scénario de navigation dans `scripts/acceptation.sh` ouvre Chromium avec deux boîtes GreenMail fictives. Le banc utilise le navigateur de Playwright ou un Chromium système et installe celui de Playwright si nécessaire. `PLI_CHROMIUM_BIN` permet de choisir un exécutable. Pour conserver les captures de Réception, du menu et de la boîte vide aux trois formats, définissez `PLI_CAPTURES_NAVIGATION` avec le chemin absolu du dossier souhaité. Ajoutez `PLI_MESURE_RETOUR=1` pour chronométrer 100 retours sur ordinateur après 10 tours d’échauffement. Le fichier `mesure-retour.json` accompagne alors les captures.
+
+Le scénario de pagination reçoit `WEBMAIL_PAGE_SIZE=4` et une boîte de vingt fils, dont dix-neuf à la même date. Il charge les pages au clavier puis par défilement, revient d’un dossier sur une ligne de la troisième page et accepte un expéditeur pendant ce temps. `PLI_CAPTURE_PAGINATION` reçoit le chemin d’une capture prise quand « Nouveautés » apparaît.
 
 ### Vérifier le parcours de lecture de bout en bout
 

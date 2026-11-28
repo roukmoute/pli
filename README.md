@@ -20,6 +20,8 @@ Ouvrez une conversation pour lire la dernière réponse. Un clic sur le nom d’
 
 Au retour en Réception, la liste déjà chargée s’affiche pendant que les nouveautés arrivent en arrière-plan. Vous retrouvez votre place même si le fil que vous venez de lire a rejoint les « Déjà vus ». Au clavier, **H** ouvre le menu et **Échap** le referme.
 
+La liste se prolonge quand vous approchez du bas, ou avec « Afficher les fils suivants ». Elle garde toutes les pages déjà parcourues. Après un détour par un autre dossier, vous retrouvez la même ligne, même loin dans la boîte. Si un courrier arrive pendant que vous lisez plus bas, la ligne sous votre pointeur reste en place et « Nouveautés » vous ramène en haut quand vous le voulez.
+
 ## Essayer Pli
 
 Depuis la racine du projet, lancez l’interface de développement et ouvrez [Pli sur votre machine](http://127.0.0.1:5173).
