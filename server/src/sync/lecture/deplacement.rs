@@ -167,20 +167,22 @@ impl Depart {
     /// pour toutes : les lettres restent de toute façon dans leur dossier.
     pub(crate) async fn copier(mut self, arrivee: &str) -> Result<Depot, Error> {
         let mut copie = Copie::default();
-        let mut acceptee = false;
-        if !self.presentes.is_empty() {
+        // Sans lettre présente, aucune commande ne part.
+        let reponse = if self.presentes.is_empty() {
+            Ok(())
+        } else {
             let commande = format!("UID COPY {} {}", ensemble(&self.presentes), boite(arrivee)?);
-            let reponse = command(&mut self.session, &commande, |reponse| {
+            command(&mut self.session, &commande, |reponse| {
                 copie.relever(reponse);
                 Ok(())
             })
-            .await;
-            acceptee = match reponse {
-                Ok(()) => true,
-                Err(refus) if refus.is::<Refus>() => false,
-                Err(panne) => return Err(panne),
-            };
-        }
+            .await
+        };
+        let acceptee = match reponse {
+            Ok(()) => true,
+            Err(refus) if refus.is::<Refus>() => false,
+            Err(panne) => return Err(panne),
+        };
         let sorts = self
             .presentes
             .iter()
