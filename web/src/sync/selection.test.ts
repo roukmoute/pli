@@ -73,4 +73,9 @@ it("confirme plus de cent fils chargés en plusieurs requêtes", async () => {
   expect(lots.flat()).toEqual(fils);
   expect(choix.echecs()).toBe(0);
   expect(choix.choisis().size).toBe(0);
+  // Deux lots pleins : aucune requête vide ne part après le dernier.
+  lots.length = 0;
+  await choix.marquer(fils.slice(1), "etoile", true);
+  expect(lots.map((lot) => lot.length)).toEqual([100, 100]);
+  expect(choix.echecs()).toBe(0);
 });
