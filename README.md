@@ -28,6 +28,8 @@ L’étoile, « Marquer comme lu » et « Marquer comme non lu » s’appliquent
 
 « Supprimer » envoie les fils dans la Corbeille de votre messagerie, sans confirmation. Depuis la Corbeille, « Restaurer » les remet dans leur dossier d’origine. « Supprimer définitivement » et « Vider le dossier » vous demandent d’abord de confirmer, en citant le dossier et le nombre de fils concernés.
 
+« Plus » propose de déplacer ou de copier la sélection, ou le fil ouvert, vers un dossier de votre boîte. Sur ordinateur, vous pouvez aussi glisser une ligne ou la sélection vers la liste des dossiers qui s’affiche. Gardez Ctrl ou Cmd enfoncé pour copier au lieu de déplacer.
+
 ## Essayer Pli
 
 Depuis la racine du projet, lancez l’interface de développement et ouvrez [Pli sur votre machine](http://127.0.0.1:5173).
