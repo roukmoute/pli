@@ -34,7 +34,34 @@ impl World {
             self.lecture = observer(&mut commande_navigation(script, self.address)).await?;
             return Ok(true);
         }
+        if texte == "j’agis sur un fil pendant que les réponses sont retenues dans le navigateur"
+        {
+            let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/operations.mjs");
+            self.lecture = observer(&mut commande_navigation(script, self.address)).await?;
+            return Ok(true);
+        }
         for (prefixe, suffixe, mesure) in [
+            (
+                "la liste montre ",
+                " gestes avant toute réponse",
+                "immediats",
+            ),
+            (
+                "lu puis non lu laisse ",
+                " message non lu dans la boîte",
+                "non_lus",
+            ),
+            (
+                "l’opération rejouée rend ",
+                " résultat identique",
+                "identiques",
+            ),
+            (
+                "l’opération d’une autre boîte est refusée ",
+                " fois",
+                "refusees",
+            ),
+            ("le refus de la messagerie rétablit ", " étoile", "retablis"),
             (
                 "les pages chargées présentent ",
                 " fils sans doublon",
@@ -96,6 +123,23 @@ mod tests {
     async fn exige_la_mesure_de_chaque_geste() {
         let mut world = World::new("127.0.0.1:1".parse().unwrap()).unwrap();
         for (etape, champ) in [
+            (
+                "la liste montre <n> gestes avant toute réponse",
+                "immediats",
+            ),
+            (
+                "lu puis non lu laisse <n> message non lu dans la boîte",
+                "non_lus",
+            ),
+            (
+                "l’opération rejouée rend <n> résultat identique",
+                "identiques",
+            ),
+            (
+                "l’opération d’une autre boîte est refusée <n> fois",
+                "refusees",
+            ),
+            ("le refus de la messagerie rétablit <n> étoile", "retablis"),
             (
                 "les pages chargées présentent <n> fils sans doublon",
                 "fils",
