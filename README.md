@@ -24,6 +24,8 @@ La liste se prolonge quand vous approchez du bas, ou avec « Afficher les fils s
 
 L’étoile, « Marquer comme lu » et « Marquer comme non lu » s’appliquent dès votre geste. Pli transmet ensuite le changement à votre messagerie. Si la confirmation tarde, la ligne indique « En attente » et l’étoile s’entoure d’un pointillé. Si la messagerie refuse, la liste retrouve son état et vous le signale.
 
+« Archiver » range dans le dossier Archives de votre messagerie les fils sélectionnés ou le fil ouvert. Ils quittent la liste dès votre geste et la barre de sélection indique l’archivage en attente jusqu’à la confirmation. Un fil que la messagerie refuse revient dans la liste, déjà sélectionné, pour que vous puissiez réessayer. Si votre messagerie n’annonce aucun dossier d’archives, Pli vous demande une fois lequel de vos dossiers les recevra.
+
 ## Essayer Pli
 
 Depuis la racine du projet, lancez l’interface de développement et ouvrez [Pli sur votre machine](http://127.0.0.1:5173).
