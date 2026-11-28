@@ -231,9 +231,17 @@ fn une_base_deja_importee_reconstruit_les_listes_et_utilise_l_index_de_page() ->
     }
     db.execute_batch(BOITES_DE_TEST)?;
     lettre(&db, 1, 3, "historique", "noa@recette.test", json!([]))?;
-    db.execute_batch(include_str!(
-        "../../../migrations/006-pages-de-courrier/up.sql"
-    ))?;
+    // Les listes sont reconstruites par la migration 006. Les suivantes complètent le schéma lu.
+    for migration in [
+        include_str!("../../../migrations/006-pages-de-courrier/up.sql"),
+        include_str!("../../../migrations/007-decisions-explicites/up.sql"),
+        include_str!("../../../migrations/008-lecture/up.sql"),
+        include_str!("../../../migrations/009-operations/up.sql"),
+        include_str!("../../../migrations/010-archivage/up.sql"),
+        include_str!("../../../migrations/011-corbeille/up.sql"),
+    ] {
+        db.execute_batch(migration)?;
+    }
     let page = storage::read(&mut db, 1, Scope::View("reception".into()), 20, None)?.unwrap();
     assert_eq!(page.nouveaux[0].id, "historique");
     assert_eq!(page.compteurs.reception, 1);

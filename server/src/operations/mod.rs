@@ -20,6 +20,7 @@ use crate::{
     sync::Lecteur,
 };
 pub(crate) use deplacement::tenter;
+use stockage::Empechement;
 pub(crate) use stockage::{Action, Depot, Lot, Sort, comptes_en_attente, conclure, prochain};
 
 pub(crate) fn router(lecteur: Lecteur) -> Router<Arc<Database>> {
@@ -55,12 +56,22 @@ async fn creer(
     let compte = compte.account_id;
     let operation = sqlite(db, move |db| stockage::creer(db, compte, &demande))
         .await?
-        .ok_or_else(|| {
-            api_error(
-                StatusCode::CONFLICT,
-                "archives_inconnues",
-                "Aucun dossier ne reçoit les archives de ce compte.",
-            )
+        .map_err(|empechement| {
+            let (code, message) = match empechement {
+                Empechement::Archives => (
+                    "archives_inconnues",
+                    "Aucun dossier ne reçoit les archives de ce compte.",
+                ),
+                Empechement::Corbeille => (
+                    "corbeille_inconnue",
+                    "La messagerie de ce compte n’annonce aucune corbeille.",
+                ),
+                Empechement::Origine => (
+                    "origine_inconnue",
+                    "Le dossier d’origine de ce courrier est inconnu.",
+                ),
+            };
+            api_error(StatusCode::CONFLICT, code, message)
         })?;
     // La réponse part sans attendre la messagerie.
     lecteur.appliquer(compte);

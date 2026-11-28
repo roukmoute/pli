@@ -126,7 +126,7 @@ fn apercus(
            row_number() OVER (PARTITION BY thread_id ORDER BY received_at DESC, uid DESC) AS rang
        FROM screening_letters WHERE account_id=?1 AND sender_address=?2 AND thread_id IN (SELECT thread_id FROM recents)
        WINDOW fil AS (PARTITION BY thread_id))
-       SELECT thread_id,subject,sender_name,sender_address,snippet,received_at,total,non_lu,etoile,piece,repondu,transfere
+       SELECT thread_id,subject,sender_name,sender_address,snippet,received_at,total,non_lu,etoile,piece,repondu,transfere,0
        FROM classes WHERE rang=1 ORDER BY received_at DESC,thread_id DESC")?
       .query_map(params![compte,adresse,PAR_PAGE as i64],crate::pages::lire_resume)?.collect()
 }

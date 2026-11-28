@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use serde_json::{Value, json};
 
 mod archivage;
+mod corbeille;
 
 use super::stockage::{
     Action, Demande, Depot, Genre, Lot, comptes_en_attente, conclure, creer, lire, prochain,
@@ -47,11 +48,16 @@ fn demande(id: &str, genre: Genre, vue: Option<&str>, cibles: &[&str]) -> Demand
         genre,
         vue: vue.map(str::to_owned),
         cibles: cibles.iter().map(|&c| c.to_owned()).collect(),
+        destination: None,
     }
 }
 
+// Rend l’opération enregistrée, ou le nom de ce qui a empêché de l’enregistrer.
 fn enregistrer(app: &TestApp, compte: i64, demande: &Demande) -> Result<Value, Error> {
-    Ok(serde_json::to_value(creer(&app.db, compte, demande)?)?)
+    Ok(match creer(&app.db, compte, demande)? {
+        Ok(operation) => serde_json::to_value(operation)?,
+        Err(empechement) => json!(format!("{empechement:?}")),
+    })
 }
 
 fn connue(app: &TestApp, compte: i64, id: &str) -> Result<Value, Error> {
@@ -97,7 +103,7 @@ fn confirmes(uids: &[u32]) -> Depot {
 fn drapeau(lot: &Lot) -> (&str, bool) {
     match &lot.action {
         Action::Drapeau { drapeau, valeur } => (drapeau, *valeur),
-        Action::Deplacement(_) => panic!("Lot de drapeau attendu."),
+        _ => panic!("Lot de drapeau attendu."),
     }
 }
 

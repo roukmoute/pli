@@ -79,8 +79,10 @@ impl Lecteur {
                 .await
                 .map(Depot::Applique),
             Action::Deplacement(Some(arrivee)) => {
-                self.deplacer(compte, lot, chemin, &arrivee.chemin).await
+                self.deplacer(compte, lot, chemin, Some(&arrivee.chemin))
+                    .await
             }
+            Action::Suppression => self.deplacer(compte, lot, chemin, None).await,
             // Le dossier d’arrivée a disparu : les lettres restent où elles sont.
             Action::Deplacement(None) => Err(Refus.into()),
         };
@@ -96,7 +98,7 @@ impl Lecteur {
         compte: i64,
         lot: &Arc<Lot>,
         chemin: &str,
-        arrivee: &str,
+        arrivee: Option<&str>,
     ) -> Result<Depot, Error> {
         let depart = self
             .partir(compte, lot.generation, chemin, &lot.uids)

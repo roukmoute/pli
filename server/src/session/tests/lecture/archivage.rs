@@ -9,7 +9,7 @@ const A: &str = "0190a1b2-0000-7000-8000-0000000000a1";
 const B: &str = "0190a1b2-0000-7000-8000-0000000000a2";
 const C: &str = "0190a1b2-0000-7000-8000-0000000000a3";
 const D: &str = "0190a1b2-0000-7000-8000-0000000000a4";
-const RECEPTION: &str = "/api/v1/views/reception";
+pub(super) const RECEPTION: &str = "/api/v1/views/reception";
 const DOSSIERS: &str = "/api/v1/folders";
 const CHOIX: &str = "/api/v1/folders/archive";
 const INBOX: i64 = 1;
@@ -17,7 +17,8 @@ const ATELIER: i64 = 2;
 const INBOX_DE_BOB: i64 = 3;
 const ARCHIVES: i64 = 4;
 const INCONNU: i64 = 99;
-const LETTRES: &str = "INSERT INTO messages(account_id,folder_id,uidvalidity,uid,thread_id,subject,
+pub(super) const LETTRES: &str =
+    "INSERT INTO messages(account_id,folder_id,uidvalidity,uid,thread_id,subject,
     received_at,recipients,flags,size,has_attachments,snippet) VALUES
     (1,1,1,5,'1/c','Devis',103,'{}','[]',5,0,''),
     (1,1,1,6,'1/a','À lire',104,'{}','[]',5,0,'');";
@@ -39,19 +40,19 @@ fn archivage(id: &str, fils: &[&str]) -> Value {
     json!({"id": id, "type": "archiver", "vue": "reception", "cibles": fils})
 }
 
-fn presentes(avant: &str, trouvees: &str) -> (String, String) {
+pub(super) fn presentes(avant: &str, trouvees: &str) -> (String, String) {
     ok(
         &format!("UID SEARCH UID {avant}"),
         &format!("* SEARCH{trouvees}\r\n"),
     )
 }
 
-fn capacites(liste: &str) -> (String, String) {
+pub(super) fn capacites(liste: &str) -> (String, String) {
     ok("CAPABILITY", &format!("* CAPABILITY IMAP4rev1{liste}\r\n"))
 }
 
 // Dialogue d’un lot : dossier ouvert, lettres trouvées, capacités, puis les commandes données.
-fn depart(avant: &str, capacite: &str, commandes: Vec<(String, String)>) -> Dialogue {
+pub(super) fn depart(avant: &str, capacite: &str, commandes: Vec<(String, String)>) -> Dialogue {
     let mut dialogue = selection("SELECT", 1);
     dialogue.push(presentes(avant, &format!(" {}", avant.replace(',', " "))));
     dialogue.push(capacites(capacite));
@@ -59,7 +60,7 @@ fn depart(avant: &str, capacite: &str, commandes: Vec<(String, String)>) -> Dial
     dialogue
 }
 
-fn ids(fils: &Value) -> Vec<&str> {
+pub(super) fn ids(fils: &Value) -> Vec<&str> {
     fils.as_array()
         .unwrap()
         .iter()

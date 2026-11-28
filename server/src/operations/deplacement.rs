@@ -37,6 +37,31 @@ pub(super) fn archives(db: &Connection, compte: i64) -> rusqlite::Result<Option<
     Ok(dossier.flatten())
 }
 
+/// Corbeille du compte : le premier dossier que la messagerie annonce avec ce rôle.
+pub(super) fn corbeille(db: &Connection, compte: i64) -> rusqlite::Result<Option<i64>> {
+    db.query_row(
+        "SELECT id FROM folders WHERE account_id=?1 AND role='trash'
+         ORDER BY remote_path LIMIT 1",
+        [compte],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
+/// Rend le dossier s’il appartient au compte et peut recevoir du courrier.
+pub(super) fn ouvrable(
+    db: &Connection,
+    compte: i64,
+    dossier: i64,
+) -> rusqlite::Result<Option<i64>> {
+    db.query_row(
+        "SELECT id FROM folders WHERE (account_id,id)=(?1,?2) AND uidvalidity IS NOT NULL",
+        [compte, dossier],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
 /// Note que la commande de déplacement part pour ces lettres. Après une coupure,
 /// celles qui ont quitté leur dossier auront été déplacées par cette commande.
 pub(crate) fn tenter(db: &Database, lot: &Lot, uids: &[u32]) -> Result<(), Error> {
@@ -83,8 +108,12 @@ pub(super) fn ranger(
              WHERE (account_id,folder_id,uidvalidity,uid)=(?1,?2,?3,?4)",
             lettre,
         )?;
+        // Replacée dans la boîte de réception, la lettre s’y lit sans repasser par le tri.
+        // Partie vers la Corbeille ou les Indésirables, elle retient d’où elle vient.
         tx.execute(
-            "UPDATE OR IGNORE messages SET folder_id=?5,uidvalidity=?6,uid=?7,moving=0
+            "UPDATE OR IGNORE messages SET folder_id=?5,uidvalidity=?6,uid=?7,moving=0,
+                 placed=(SELECT role IS 'inbox' FROM folders WHERE id=?5),
+                 origin_folder=(SELECT ?2 FROM folders WHERE id=?5 AND role IN ('trash','junk'))
              WHERE (account_id,folder_id,uidvalidity,uid)=(?1,?2,?3,?4)",
             params![
                 compte,

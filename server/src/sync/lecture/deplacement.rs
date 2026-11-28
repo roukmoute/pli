@@ -86,7 +86,14 @@ impl Copie {
     }
 }
 
-// Sans MOVE : copie, marque puis efface les seules lettres du lot (RFC 4315).
+// Marque puis efface les seules lettres du lot (RFC 4315).
+async fn retirer(session: &mut ImapSession, lettres: &str) -> Result<(), Error> {
+    let marque = format!("UID STORE {lettres} +FLAGS.SILENT (\\Deleted)");
+    command(session, &marque, |_| Ok(())).await?;
+    command(session, &format!("UID EXPUNGE {lettres}"), |_| Ok(())).await
+}
+
+// Sans MOVE : copie, puis retire les lettres copiées.
 async fn copier_puis_retirer(
     session: &mut ImapSession,
     lettres: &str,
@@ -98,9 +105,7 @@ async fn copier_puis_retirer(
         Ok(())
     })
     .await?;
-    let marque = format!("UID STORE {lettres} +FLAGS.SILENT (\\Deleted)");
-    command(session, &marque, |_| Ok(())).await?;
-    command(session, &format!("UID EXPUNGE {lettres}"), |_| Ok(())).await
+    retirer(session, lettres).await
 }
 
 impl Lecteur {
@@ -118,15 +123,17 @@ impl Lecteur {
     }
 }
 
-// Envoie la commande de déplacement et relève les UID d’arrivée annoncés.
+// Envoie les commandes qui déplacent les lettres vers `arrivee`, ou qui les effacent
+// faute d’arrivée, et relève les UID annoncés. Sans effacement ciblé, d’autres lettres
+// marquées supprimées partiraient aussi : la demande est alors refusée.
 // Après un refus, la recherche qui suit tranche lettre par lettre.
 async fn envoyer(
     session: &mut ImapSession,
     uids: &[u32],
-    arrivee: &str,
+    arrivee: Option<&str>,
     copie: &mut Copie,
 ) -> Result<(), Error> {
-    let boite = boite(arrivee)?;
+    let boite = arrivee.map(boite).transpose()?;
     let lettres = ensemble(uids);
     let capacites = timeout(COMMAND_TIMEOUT, session.capabilities()).await??;
     let sait = |nom: &str| {
@@ -134,18 +141,20 @@ async fn envoyer(
             .iter()
             .any(|c| matches!(c, Capability::Atom(atome) if atome.eq_ignore_ascii_case(nom)))
     };
-    let envoi = if sait("MOVE") {
-        let commande = format!("UID MOVE {lettres} {boite}");
-        command(session, &commande, |reponse| {
-            copie.relever(reponse);
-            Ok(())
-        })
-        .await
-    } else if sait("UIDPLUS") {
-        copier_puis_retirer(session, &lettres, &boite, copie).await
-    } else {
-        // Sans effacement ciblé, d’autres lettres marquées supprimées partiraient aussi.
-        Err(Refus.into())
+    let envoi = match boite {
+        Some(boite) if sait("MOVE") => {
+            let commande = format!("UID MOVE {lettres} {boite}");
+            command(session, &commande, |reponse| {
+                copie.relever(reponse);
+                Ok(())
+            })
+            .await
+        }
+        Some(boite) if sait("UIDPLUS") => {
+            copier_puis_retirer(session, &lettres, &boite, copie).await
+        }
+        None if sait("UIDPLUS") => retirer(session, &lettres).await,
+        _ => Err(Refus.into()),
     };
     match envoi {
         Err(panne) if !panne.is::<Refus>() => Err(panne),
@@ -154,8 +163,9 @@ async fn envoyer(
 }
 
 impl Depart {
-    /// Déplace les lettres présentes vers `arrivee`, puis constate lesquelles sont parties.
-    pub(crate) async fn transferer(mut self, arrivee: &str) -> Result<Depot, Error> {
+    /// Déplace les lettres présentes vers `arrivee`, ou les efface faute d’arrivée,
+    /// puis constate lesquelles sont parties.
+    pub(crate) async fn transferer(mut self, arrivee: Option<&str>) -> Result<Depot, Error> {
         let mut copie = Copie::default();
         let mut restees = Vec::new();
         // Sans lettre présente, aucune commande ne part.

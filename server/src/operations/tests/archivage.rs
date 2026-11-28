@@ -22,7 +22,7 @@ const RECEPTION: &str = "reception";
 const CLASSEES: &str = "dossier/4";
 
 // Réception d’Alice : le fil A déjà consulté, le fil B de deux lettres et le fil C.
-fn classeur() -> Result<TestApp, Error> {
+pub(super) fn classeur() -> Result<TestApp, Error> {
     let app = boite()?;
     app.db.writer()?.execute_batch(
         r#"INSERT INTO folders(id,account_id,remote_path,role,uidvalidity,uidnext)
@@ -39,7 +39,7 @@ fn archivage(id: &str, cibles: &[&str]) -> super::Demande {
     demande(id, Genre::Archiver, Some(RECEPTION), cibles)
 }
 
-fn fils(app: &TestApp, portee: &str) -> Result<Vec<String>, Error> {
+pub(super) fn fils(app: &TestApp, portee: &str) -> Result<Vec<String>, Error> {
     let db = app.db.reader()?;
     let fils = db
         .prepare(
@@ -52,7 +52,7 @@ fn fils(app: &TestApp, portee: &str) -> Result<Vec<String>, Error> {
 }
 
 // Emplacement de chaque lettre du fil : dossier, génération, UID et départ en cours.
-fn lettres(app: &TestApp, fil: &str) -> Result<Vec<(i64, u32, u32, bool)>, Error> {
+pub(super) fn lettres(app: &TestApp, fil: &str) -> Result<Vec<(i64, u32, u32, bool)>, Error> {
     let db = app.db.reader()?;
     let lettres = db
         .prepare(
@@ -66,14 +66,14 @@ fn lettres(app: &TestApp, fil: &str) -> Result<Vec<(i64, u32, u32, bool)>, Error
     Ok(lettres)
 }
 
-fn arrivee(lot: &Lot) -> Option<&str> {
+pub(super) fn arrivee(lot: &Lot) -> Option<&str> {
     match &lot.action {
         Action::Deplacement(arrivee) => arrivee.as_ref().map(|a| a.chemin.as_str()),
-        Action::Drapeau { .. } => panic!("Lot de déplacement attendu."),
+        _ => panic!("Lot de déplacement attendu."),
     }
 }
 
-fn deplacees(generation: u32, sorts: &[(u32, Sort)]) -> Depot {
+pub(super) fn deplacees(generation: u32, sorts: &[(u32, Sort)]) -> Depot {
     Depot::Deplace {
         generation: Some(generation),
         sorts: sorts.iter().copied().collect(),
@@ -280,7 +280,7 @@ fn sans_dossier_d_archives_rien_n_est_enregistre() -> Result<(), Error> {
     let app = boite()?;
     let avant = revision(&app, ALICE)?;
     let sans_arrivee = enregistrer(&app, ALICE, &archivage(A, &["1/fil"]))?;
-    assert_eq!(sans_arrivee, Value::Null);
+    assert_eq!(sans_arrivee, "Archives");
     assert_eq!(connue(&app, ALICE, A)?, Value::Null);
     assert_eq!(revision(&app, ALICE)?, avant);
     assert_eq!(fils(&app, RECEPTION)?, ["1/fil"]);

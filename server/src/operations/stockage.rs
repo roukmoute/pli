@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
-use super::deplacement::{Arrivee, archives, ranger};
+use super::deplacement::{Arrivee, archives, corbeille, ouvrable, ranger};
 use crate::{
     Error,
     db::Database,
@@ -18,6 +18,10 @@ pub(super) enum Genre {
     Lu,
     NonLu,
     Archiver,
+    Corbeille,
+    Restaurer,
+    SupprimerDefinitivement,
+    ViderDossier,
 }
 
 impl Genre {
@@ -28,6 +32,10 @@ impl Genre {
             Self::Lu => "lu",
             Self::NonLu => "non_lu",
             Self::Archiver => "archiver",
+            Self::Corbeille => "corbeille",
+            Self::Restaurer => "restaurer",
+            Self::SupprimerDefinitivement => "supprimer_definitivement",
+            Self::ViderDossier => "vider_dossier",
         }
     }
 }
@@ -39,6 +47,16 @@ pub(super) struct Demande {
     pub genre: Genre,
     pub vue: Option<String>,
     pub cibles: Vec<String>,
+    /// Dossier où restaurer les lettres dont l’origine est inconnue.
+    pub destination: Option<i64>,
+}
+
+/// Dossier d’arrivée qui manque pour enregistrer un déplacement.
+#[derive(Debug, PartialEq)]
+pub(super) enum Empechement {
+    Archives,
+    Corbeille,
+    Origine,
 }
 
 #[derive(Serialize)]
@@ -94,16 +112,28 @@ pub(super) fn lire(db: &Connection, compte: i64, id: &str) -> rusqlite::Result<O
 }
 
 // Une lettre déjà rangée dans le dossier d’arrivée n’a pas à être déplacée.
+// « Restaurer » ramène chaque lettre de la Corbeille ou des Indésirables vers son
+// dossier d’origine. Une suppression définitive ne part que de la Corbeille.
 const LETTRES: &str =
-    "INSERT INTO operation_messages(operation,position,folder_id,uidvalidity,uid,previous)
+    "INSERT INTO operation_messages(operation,position,folder_id,uidvalidity,uid,previous,destination)
      SELECT o.seq,?2,m.folder_id,m.uidvalidity,m.uid,
-            EXISTS(SELECT 1 FROM json_each(m.flags) WHERE lower(value)=lower(k.flag))
+            EXISTS(SELECT 1 FROM json_each(m.flags) WHERE lower(value)=lower(k.flag)),
+            CASE WHEN o.kind='restaurer' THEN
+                (SELECT g.id FROM folders g WHERE g.id=m.origin_folder AND g.uidvalidity IS NOT NULL)
+            END
      FROM readable_messages m JOIN operations o ON o.seq=?1 AND o.account_id=m.account_id
      JOIN operation_kinds k ON k.kind=o.kind
-     WHERE m.folder_id IS NOT o.destination AND ";
+     JOIN folders f ON f.id=m.folder_id
+     WHERE m.folder_id IS NOT o.destination
+       AND CASE o.kind WHEN 'supprimer_definitivement' THEN f.role IS 'trash'
+                       WHEN 'restaurer' THEN f.role IN ('trash','junk')
+                       WHEN 'vider_dossier' THEN f.role IN ('trash','junk')
+                       ELSE 1 END
+       AND ";
 
 // Avec une vue, une cible désigne un fil et couvre ses lettres visibles dans cette vue.
-// Sans vue, elle désigne une lettre. Le compte de l’opération borne les deux recherches.
+// Sans vue, elle désigne une lettre. Pour vider un dossier, elle désigne ce dossier.
+// Le compte de l’opération borne ces recherches.
 fn viser(tx: &Connection, seq: i64, demande: &Demande) -> rusqlite::Result<()> {
     let mut cible = tx.prepare_cached("INSERT INTO operation_targets VALUES (?1,?2,?3)")?;
     let mut fil = tx.prepare_cached(&format!(
@@ -112,10 +142,13 @@ fn viser(tx: &Connection, seq: i64, demande: &Demande) -> rusqlite::Result<()> {
     let mut lettre = tx.prepare_cached(&format!(
         "{LETTRES}(m.folder_id,m.uidvalidity,m.uid)=(?3,?4,?5)"
     ))?;
+    let mut dossier = tx.prepare_cached(&format!("{LETTRES}'dossier/' || m.folder_id=?3"))?;
     for (position, id) in demande.cibles.iter().enumerate() {
         let position = position as i64;
         cible.execute(params![seq, position, id])?;
-        if let Some(vue) = &demande.vue {
+        if let Genre::ViderDossier = demande.genre {
+            dossier.execute(params![seq, position, id])?;
+        } else if let Some(vue) = &demande.vue {
             fil.execute(params![seq, position, id, vue])?;
         } else if let Some(cle) = Cle::lire(id) {
             lettre.execute(params![seq, position, cle.dossier, cle.generation, cle.uid])?;
@@ -124,28 +157,39 @@ fn viser(tx: &Connection, seq: i64, demande: &Demande) -> rusqlite::Result<()> {
     Ok(())
 }
 
+// Dossier d’arrivée fixé pour toute l’opération à son enregistrement.
+fn arrivee(
+    tx: &Connection,
+    compte: i64,
+    demande: &Demande,
+) -> rusqlite::Result<Result<Option<i64>, Empechement>> {
+    Ok(match (demande.genre, demande.destination) {
+        (Genre::Archiver, _) => archives(tx, compte)?.map(Some).ok_or(Empechement::Archives),
+        (Genre::Corbeille, _) => corbeille(tx, compte)?
+            .map(Some)
+            .ok_or(Empechement::Corbeille),
+        // Repli choisi par l’utilisateur pour les lettres sans dossier d’origine.
+        (Genre::Restaurer, Some(choix)) => Ok(ouvrable(tx, compte, choix)?),
+        _ => Ok(None),
+    })
+}
+
 /// Enregistre l’opération, sa projection et la révision du compte dans une seule transaction.
-/// Sans dossier d’arrivée pour le déplacement demandé, rien n’est enregistré.
+/// Sans dossier d’arrivée pour un déplacement demandé, rien n’est enregistré.
 pub(super) fn creer(
     db: &Database,
     compte: i64,
     demande: &Demande,
-) -> Result<Option<Operation>, Error> {
+) -> Result<Result<Operation, Empechement>, Error> {
     let mut writer = db.writer()?;
     let tx = writer.transaction()?;
     // Un identifiant déjà connu rend son résultat sans rien réappliquer.
     if let Some(connue) = lire(&tx, compte, &demande.id)? {
-        return Ok(Some(connue));
+        return Ok(Ok(connue));
     }
-    // Un déplacement fixe son dossier d’arrivée dès l’enregistrement.
-    let destination = match demande.genre {
-        Genre::Archiver => {
-            let Some(dossier) = archives(&tx, compte)? else {
-                return Ok(None);
-            };
-            Some(dossier)
-        }
-        _ => None,
+    let destination = match arrivee(&tx, compte, demande)? {
+        Ok(destination) => destination,
+        Err(empechement) => return Ok(Err(empechement)),
     };
     tx.execute(
         "INSERT INTO operations(account_id,id,kind,destination) VALUES (?1,?2,?3,?4)",
@@ -153,6 +197,17 @@ pub(super) fn creer(
     )?;
     let seq = tx.last_insert_rowid();
     viser(&tx, seq, demande)?;
+    // Une lettre à restaurer sans origine connue attend que l’utilisateur choisisse un dossier.
+    let sans_arrivee: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM operation_messages m JOIN operations o ON o.seq=m.operation
+                       WHERE o.seq=?1 AND o.kind='restaurer'
+                         AND coalesce(m.destination,o.destination) IS NULL)",
+        [seq],
+        |r| r.get(0),
+    )?;
+    if sans_arrivee {
+        return Ok(Err(Empechement::Origine));
+    }
     tx.execute(
         "UPDATE messages SET flags=CASE WHEN k.expected THEN json_insert(messages.flags,'$[#]',k.flag)
            ELSE (SELECT json_group_array(value) FROM json_each(messages.flags) WHERE lower(value)!=lower(k.flag)) END
@@ -163,10 +218,10 @@ pub(super) fn creer(
            AND EXISTS(SELECT 1 FROM json_each(messages.flags) WHERE lower(value)=lower(k.flag)) != k.expected",
         [seq],
     )?;
-    // Une lettre à déplacer quitte ses listes dès l’enregistrement.
+    // Une lettre à déplacer ou à effacer quitte ses listes dès l’enregistrement.
     tx.execute(
-        "UPDATE messages SET moving=1 FROM operations o
-         WHERE o.seq=?1 AND o.destination IS NOT NULL AND messages.account_id=o.account_id
+        "UPDATE messages SET moving=1 FROM operations o JOIN operation_kinds k ON k.kind=o.kind
+         WHERE o.seq=?1 AND k.flag IS NULL AND messages.account_id=o.account_id
            AND (messages.folder_id,messages.uidvalidity,messages.uid) IN
                (SELECT folder_id,uidvalidity,uid FROM operation_messages WHERE operation=o.seq)",
         [seq],
@@ -180,7 +235,7 @@ pub(super) fn creer(
     let operation =
         lire(&tx, compte, &demande.id)?.ok_or("Opération illisible après son enregistrement.")?;
     tx.commit()?;
-    Ok(Some(operation))
+    Ok(Ok(operation))
 }
 
 pub(crate) fn comptes_en_attente(db: &Database) -> Result<Vec<i64>, Error> {
@@ -200,6 +255,8 @@ pub(crate) enum Action {
     },
     /// Sans arrivée quand le dossier prévu a disparu depuis l’enregistrement.
     Deplacement(Option<Arrivee>),
+    /// Efface les lettres pour de bon.
+    Suppression,
 }
 
 /// Lettres d’un même dossier à modifier par une seule série de commandes IMAP.
@@ -209,32 +266,39 @@ pub(crate) struct Lot {
     pub generation: u32,
     /// Absent quand le dossier a disparu ou changé de génération.
     pub chemin: Option<String>,
+    // Dossier d’arrivée prévu pour ces lettres, s’il existe encore.
+    prevue: Option<i64>,
     pub action: Action,
     pub uids: Vec<u32>,
 }
 
-/// Premier lot de la plus ancienne opération en attente du compte.
+/// Premier lot de la plus ancienne opération en attente du compte :
+/// des lettres d’un même dossier, promises au même dossier d’arrivée.
 pub(crate) fn prochain(db: &Database, compte: i64) -> Result<Option<Lot>, Error> {
     let reader = db.reader()?;
     let premier = reader
         .query_row(
-            "SELECT o.seq,m.folder_id,m.uidvalidity,f.remote_path,k.flag,k.expected,
+            "SELECT o.seq,m.folder_id,m.uidvalidity,f.remote_path,
+                    k.flag AS drapeau,k.expected AS valeur,k.expunges AS efface,
+                    coalesce(m.destination,o.destination) AS prevue,
                     a.id AS arrivee,a.uidvalidity AS generation_arrivee,
                     a.remote_path AS chemin_arrivee
              FROM operations o
              JOIN operation_kinds k ON k.kind=o.kind
              JOIN operation_messages m ON m.operation=o.seq AND m.result='en_attente'
              LEFT JOIN folders f ON f.id=m.folder_id AND f.uidvalidity=m.uidvalidity
-             LEFT JOIN folders a ON a.id=o.destination AND a.uidvalidity IS NOT NULL
+             LEFT JOIN folders a ON a.id=coalesce(m.destination,o.destination)
+                 AND a.uidvalidity IS NOT NULL
              WHERE o.account_id=?1 AND o.state='en_attente'
-             ORDER BY o.seq,m.folder_id,m.uidvalidity LIMIT 1",
+             ORDER BY o.seq,m.folder_id,m.uidvalidity,prevue LIMIT 1",
             [compte],
             |r| {
-                let action = match r.get::<_, Option<String>>(4)? {
+                let action = match r.get::<_, Option<String>>("drapeau")? {
                     Some(drapeau) => Action::Drapeau {
                         drapeau,
-                        valeur: r.get(5)?,
+                        valeur: r.get("valeur")?,
                     },
+                    None if r.get("efface")? => Action::Suppression,
                     None => Action::Deplacement(Arrivee::lire(r)?),
                 };
                 Ok(Lot {
@@ -242,6 +306,7 @@ pub(crate) fn prochain(db: &Database, compte: i64) -> Result<Option<Lot>, Error>
                     dossier: r.get(1)?,
                     generation: r.get(2)?,
                     chemin: r.get(3)?,
+                    prevue: r.get("prevue")?,
                     action,
                     uids: Vec::new(),
                 })
@@ -253,11 +318,15 @@ pub(crate) fn prochain(db: &Database, compte: i64) -> Result<Option<Lot>, Error>
     };
     lot.uids = reader
         .prepare_cached(
-            "SELECT DISTINCT uid FROM operation_messages
-             WHERE operation=?1 AND (folder_id,uidvalidity)=(?2,?3) AND result='en_attente'
-             ORDER BY uid LIMIT 100",
+            "SELECT DISTINCT m.uid FROM operation_messages m JOIN operations o ON o.seq=m.operation
+             WHERE m.operation=?1 AND (m.folder_id,m.uidvalidity)=(?2,?3) AND m.result='en_attente'
+               AND coalesce(m.destination,o.destination) IS ?4
+             ORDER BY m.uid LIMIT 100",
         )?
-        .query_map(params![lot.seq, lot.dossier, lot.generation], |r| r.get(0))?
+        .query_map(
+            params![lot.seq, lot.dossier, lot.generation, lot.prevue],
+            |r| r.get(0),
+        )?
         .collect::<rusqlite::Result<_>>()?;
     Ok(Some(lot))
 }
@@ -394,6 +463,7 @@ pub(crate) fn conclure(db: &Database, compte: i64, lot: &Lot, depot: &Depot) -> 
             (Action::Deplacement(arrivee), issue) => {
                 ranger(&tx, compte, lot, uid, issue, arrivee.as_ref(), depot)?
             }
+            (Action::Suppression, issue) => ranger(&tx, compte, lot, uid, issue, None, depot)?,
         }
     }
     tx.execute(

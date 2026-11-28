@@ -2,8 +2,13 @@ use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use super::{Counts, Coverage, Cursor, Page, Scope, Sender, Thread};
 
+// Dans la Corbeille ou les Indésirables, un fil est sans origine quand une de ses
+// lettres n’a pas de dossier où la restaurer.
 pub(super) const SELECT_PAGE: &str = "SELECT p.item,m.subject,m.sender_name,m.sender_address,m.snippet,p.received_at,
-        p.message_count,p.unread,p.starred,p.attached,p.answered,p.forwarded
+        p.message_count,p.unread,p.starred,p.attached,p.answered,p.forwarded,
+        EXISTS(SELECT 1 FROM messages x JOIN folders g ON g.id=x.folder_id AND g.role IN ('trash','junk')
+               WHERE x.account_id=p.account_id AND x.thread_id=p.item AND 'dossier/' || x.folder_id=p.scope
+                 AND x.origin_folder IS NULL AND NOT x.moving)
     FROM list_threads p JOIN messages m
       ON (m.account_id,m.folder_id,m.uidvalidity,m.uid)=(p.account_id,p.folder_id,p.uidvalidity,p.uid)
     WHERE p.account_id=?1 AND p.scope=?2";
@@ -24,6 +29,7 @@ pub(crate) fn thread(row: &Row<'_>) -> rusqlite::Result<Thread> {
         piece_jointe: row.get(9)?,
         repondu: row.get(10)?,
         transfere: row.get(11)?,
+        sans_origine: row.get(12)?,
     })
 }
 
@@ -139,6 +145,11 @@ pub(super) fn read(
         let counts = Counts { reception: row.get(0)?, flux: row.get(1)?, justificatifs: row.get(2)? };
         Ok((counts, row.get(3)?))
     })?;
+    let total = tx
+        .prepare_cached("SELECT total FROM list_counts WHERE (account_id,scope)=(?1,?2)")?
+        .query_row(params![account, scope.key()], |row| row.get(0))
+        .optional()?
+        .unwrap_or_default();
     let (vue, dossier) = match scope {
         Scope::View(v) => (Some(v), None),
         Scope::Folder(id) => (None, Some(id)),
@@ -151,6 +162,7 @@ pub(super) fn read(
         nouveaux,
         deja_vus,
         curseur_suivant,
+        total,
         revision,
         couverture,
         compteurs,

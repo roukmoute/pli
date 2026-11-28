@@ -104,6 +104,9 @@ pub(crate) struct Thread {
     piece_jointe: bool,
     repondu: bool,
     transfere: bool,
+    /// Vrai dans la Corbeille ou les Indésirables quand le fil ne sait pas où revenir.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    sans_origine: bool,
 }
 
 #[derive(Serialize)]
@@ -131,6 +134,8 @@ struct Page {
     nouveaux: Vec<Thread>,
     deja_vus: Vec<Thread>,
     curseur_suivant: Option<String>,
+    /// Nombre de fils de la liste entière, pages non chargées comprises.
+    total: i64,
     revision: i64,
     couverture: Coverage,
     compteurs: Counts,
