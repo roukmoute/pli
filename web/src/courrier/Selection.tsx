@@ -9,11 +9,12 @@ export function BarreSelection(props: { ids: string[]; selection: Selection }) {
   const nombre = () => lot().length;
   const total = () => props.ids.length;
   let controlePage!: HTMLInputElement;
-  function marquer(valeur: boolean, bouton: HTMLButtonElement) {
+  function marquer(valeur: boolean) {
     void selection.marquer(lot(), "lu", valeur);
     // Le lot quitte la sélection dès le geste et ses commandes disparaissent avec lui.
     flush();
-    if (!bouton.isConnected && document.activeElement === document.body)
+    // Le focus qu’elles portaient rejoint la case de la page.
+    if (document.activeElement === document.body)
       controlePage.focus({ preventScroll: true });
   }
   return (
@@ -42,14 +43,14 @@ export function BarreSelection(props: { ids: string[]; selection: Selection }) {
         <button
           class={styles.boutonLot}
           type="button"
-          onClick={(e) => marquer(true, e.currentTarget)}
+          onClick={() => marquer(true)}
         >
           {t("markRead")}
         </button>
         <button
           class={styles.boutonLot}
           type="button"
-          onClick={(e) => marquer(false, e.currentTarget)}
+          onClick={() => marquer(false)}
         >
           {t("markUnread")}
         </button>

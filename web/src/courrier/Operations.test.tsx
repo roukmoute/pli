@@ -228,11 +228,13 @@ it("garde sélectionnés les fils refusés d’un lot et rend le focus à la cas
   fireEvent.click(avatar("b"));
   await view.findByText("2 fils sélectionnés sur 3");
   const lire = view.getByRole("button", { name: "Marquer comme lu" });
+  const focus = vi.spyOn(globale, "focus");
   lire.focus();
   fireEvent.click(lire);
   // Les commandes du lot disparaissent avec lui : le focus rejoint la case de la page.
   expect(lire.isConnected).toBe(false);
   expect(document.activeElement).toBe(globale);
+  expect(focus.mock.calls).toEqual([[{ preventScroll: true }]]);
   expect(view.getByRole("status").textContent).toBe(
     "0 fils sélectionnés sur 3",
   );
@@ -255,4 +257,10 @@ it("garde sélectionnés les fils refusés d’un lot et rend le focus à la cas
   expect(avatar("b").checked).toBe(true);
   expect(globale.indeterminate).toBe(true);
   expect(window.location.pathname).toBe("/reception");
+  // Un focus posé ailleurs au moment du geste n’est pas déplacé.
+  fireEvent.click(view.getByRole("button", { name: "Marquer comme non lu" }));
+  expect(avatar("b").checked).toBe(false);
+  expect(document.activeElement).toBe(menu);
+  expect(focus).toHaveBeenCalledTimes(1);
+  await relue(3);
 });
