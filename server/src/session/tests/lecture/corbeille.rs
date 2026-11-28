@@ -101,7 +101,9 @@ async fn supprimer_puis_restaurer_ajuste_la_corbeille_et_la_reception() -> Resul
     assert_eq!(ids(&corbeille["nouveaux"]), ["1/c"]);
     assert_eq!(corbeille["total"], 1);
     // Le fil sait d’où il vient : rien ne signale une origine inconnue.
-    assert_eq!(corbeille["nouveaux"][0].get("sans_origine"), None);
+    let jete = &corbeille["nouveaux"][0];
+    assert_eq!(jete["id"], "1/c");
+    assert_eq!(jete.get("sans_origine"), None);
 
     // Restaurer le ramène dans son dossier d’origine et ajuste les deux compteurs.
     let rendue = banc
@@ -134,7 +136,14 @@ async fn la_suppression_definitive_n_expurge_que_les_lettres_ciblees() -> Result
     let (pair, _suivi) = messagerie(listener, vec![ciblees, sans_uidplus, videe]);
     let corbeille = banc.lire(CORBEILLE).await;
     assert_eq!(corbeille["total"], 3);
-    assert_eq!(corbeille["nouveaux"][0]["sans_origine"], true);
+    // Aucun de ces trois fils ne sait où revenir.
+    let orphelins: Vec<&Value> = corbeille["nouveaux"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|fil| &fil["sans_origine"])
+        .collect();
+    assert_eq!(orphelins, [&json!(true); 3]);
 
     let effacer = demande(A, "supprimer_definitivement", JETEES, &["1/x", "1/y"]);
     let reponse = banc.envoyer(OPERATIONS, effacer).await;
@@ -197,10 +206,11 @@ async fn sans_corbeille_ou_sans_origine_la_demande_dit_ce_qui_manque() -> Result
     assert_eq!(sans_corbeille.body["code"], "corbeille_inconnue");
     assert_eq!(banc.etat(A).await["code"], "operation_introuvable");
 
-    let db = banc.app.db.writer()?;
-    db.execute_batch(DOSSIERS)?;
-    db.execute_batch(JETEES_AILLEURS)?;
-    drop(db);
+    {
+        let db = banc.app.db.writer()?;
+        db.execute_batch(DOSSIERS)?;
+        db.execute_batch(JETEES_AILLEURS)?;
+    }
     let restaurer = demande(A, "restaurer", JETEES, &["1/x"]);
     let sans_origine = banc.envoyer(OPERATIONS, restaurer.clone()).await;
     assert_eq!(sans_origine.status, StatusCode::CONFLICT);

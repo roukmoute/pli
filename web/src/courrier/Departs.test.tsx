@@ -725,6 +725,7 @@ it("vide la Corbeille après avoir cité son nom et le nombre de fils", async ()
     "Le dossier n’a pas été entièrement vidé.",
   );
   await waitFor(() => expect(lignes()).toEqual(["a", "b"]));
+  expect(view.queryByRole("dialog")).toBeNull();
   expect(envois()).toEqual([["vider_dossier", "dossier/8", "dossier/8"]]);
 
   serveur.refus = [];

@@ -124,3 +124,23 @@ it("annonce un vidage que la messagerie n’a pas entièrement confirmé", async
   await choix.partir("corbeille", ["a"]);
   expect(refus()).toBe(false);
 });
+
+it("efface l’annonce d’un vidage refusé dès que le suivant part", async () => {
+  const retenue = reponseRetenue<string[]>();
+  const lancer = vi
+    .fn<(type: string, ids: string[]) => Promise<string[]>>()
+    .mockResolvedValueOnce(["dossier/8"])
+    .mockReturnValueOnce(retenue.promise);
+  const choix = creerSelection(lancer);
+  await choix.vider("dossier/8");
+  flush();
+  expect(choix.vidageRefuse()).toBe(true);
+  const reprise = choix.vider("dossier/8");
+  flush();
+  // La messagerie n’a pas encore répondu : plus rien n’est annoncé.
+  expect(choix.vidageRefuse()).toBe(false);
+  retenue.resolve([]);
+  await reprise;
+  flush();
+  expect(choix.vidageRefuse()).toBe(false);
+});

@@ -224,6 +224,8 @@ fn restaurer_sans_origine_connue_attend_le_choix_d_un_dossier() -> Result<(), Er
     let close = connue(&app, ALICE, A)?;
     assert_eq!(close["etat"], "confirmee");
     assert_eq!(resultats(&close), [("1/x", "partiel"), ("1/y", "confirme")]);
+    // La lettre sans origine a rejoint le dossier choisi sous son nouvel UID.
+    assert_eq!(lettres(&app, "1/y")?, [(ATELIER, 1, 9, false)]);
     // La lettre refusée retrouve la Corbeille avec son origine.
     assert_eq!(fils(&app, JETEES)?, ["1/x"]);
     assert_eq!(origines(&app, CORBEILLE)?, [(21, Some(INBOX))]);
