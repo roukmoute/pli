@@ -22,6 +22,8 @@ Au retour en Réception, la liste déjà chargée s’affiche pendant que les no
 
 La liste se prolonge quand vous approchez du bas, ou avec « Afficher les fils suivants ». Elle garde toutes les pages déjà parcourues. Après un détour par un autre dossier, vous retrouvez la même ligne, même loin dans la boîte. Si un courrier arrive pendant que vous lisez plus bas, la ligne sous votre pointeur reste en place et « Nouveautés » vous ramène en haut quand vous le voulez.
 
+L’étoile, « Marquer comme lu » et « Marquer comme non lu » s’appliquent dès votre geste. Pli transmet ensuite le changement à votre messagerie. Si la confirmation tarde, la ligne indique « En attente » et l’étoile s’entoure d’un pointillé. Si la messagerie refuse, la liste retrouve son état et vous le signale.
+
 ## Essayer Pli
 
 Depuis la racine du projet, lancez l’interface de développement et ouvrez [Pli sur votre machine](http://127.0.0.1:5173).
