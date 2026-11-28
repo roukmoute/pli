@@ -1,5 +1,6 @@
 mod pagination;
 mod projection;
+mod reglage;
 mod tri;
 
 use super::*;

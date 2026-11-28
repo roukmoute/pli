@@ -3,10 +3,10 @@ pub(crate) use storage::thread as lire_resume;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::{Path, Query, State, rejection::QueryRejection},
     http::StatusCode,
     routing::get,
@@ -14,15 +14,40 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error,
     db::Database,
     http::{ApiError, api_error, unavailable},
     session::CompteAuthentifie,
 };
 
-pub(crate) fn router() -> Router<Arc<Database>> {
+const SIZES: std::ops::RangeInclusive<usize> = 1..=100;
+
+/// Taille de page servie quand la requête ne précise pas `taille`.
+/// Les lots d’import IMAP gardent leur propre taille.
+#[derive(Clone, Copy)]
+pub(crate) struct PageConfig {
+    size: usize,
+}
+
+impl PageConfig {
+    pub(crate) fn from_env() -> Result<Self, Error> {
+        Self::parse(env::var("WEBMAIL_PAGE_SIZE").ok().as_deref())
+    }
+
+    pub(crate) fn parse(size: Option<&str>) -> Result<Self, Error> {
+        let size = size.filter(|value| !value.is_empty()).unwrap_or("20");
+        match size.parse() {
+            Ok(size) if SIZES.contains(&size) => Ok(Self { size }),
+            _ => Err("WEBMAIL_PAGE_SIZE doit être un entier de 1 à 100.".into()),
+        }
+    }
+}
+
+pub(crate) fn router(config: PageConfig) -> Router<Arc<Database>> {
     Router::new()
         .route("/v1/views/{vue}", get(view))
         .route("/v1/folders/{id}/messages", get(folder))
+        .layer(Extension(config))
 }
 
 #[derive(Deserialize, Default)]
@@ -131,33 +156,50 @@ fn absent() -> ApiError {
 async fn view(
     account: CompteAuthentifie,
     State(db): State<Arc<Database>>,
+    Extension(config): Extension<PageConfig>,
     Path(name): Path<String>,
     parameters: Result<Query<Parameters>, QueryRejection>,
 ) -> Result<Json<Page>, ApiError> {
     if !matches!(name.as_str(), "reception" | "flux" | "justificatifs") {
         return Err(absent());
     }
-    page(db, account.account_id, Scope::View(name), parameters).await
+    page(
+        db,
+        account.account_id,
+        Scope::View(name),
+        config,
+        parameters,
+    )
+    .await
 }
 
 async fn folder(
     account: CompteAuthentifie,
     State(db): State<Arc<Database>>,
+    Extension(config): Extension<PageConfig>,
     Path(id): Path<i64>,
     parameters: Result<Query<Parameters>, QueryRejection>,
 ) -> Result<Json<Page>, ApiError> {
-    page(db, account.account_id, Scope::Folder(id), parameters).await
+    page(
+        db,
+        account.account_id,
+        Scope::Folder(id),
+        config,
+        parameters,
+    )
+    .await
 }
 
 async fn page(
     db: Arc<Database>,
     account: i64,
     scope: Scope,
+    config: PageConfig,
     parameters: Result<Query<Parameters>, QueryRejection>,
 ) -> Result<Json<Page>, ApiError> {
     let Query(parameters) = parameters.map_err(|_| invalid())?;
-    let size = parameters.taille.unwrap_or(20);
-    if !(1..=100).contains(&size) {
+    let size = parameters.taille.unwrap_or(config.size);
+    if !SIZES.contains(&size) {
         return Err(invalid());
     }
     let cursor = parameters

@@ -30,7 +30,7 @@ pub fn router(
             config.allow_test,
             sync,
         ))
-        .merge(crate::pages::router())
+        .merge(crate::pages::router(crate::pages::PageConfig::from_env()?))
         .merge(crate::tri::router())
         .route("/v1/folders", get(sync::folders))
         .nest("/admin/v1", admin::router(db.clone(), config))
