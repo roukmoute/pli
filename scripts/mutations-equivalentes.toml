@@ -56,6 +56,6 @@ sha256 = "9b5ed521bb5d99b89f382037ae5e48265e4df7e122ab00a0ef062f41461e96a8"
 "76:55 ?? -> ||" = "Le titre suivant est un élément h2, null ou undefined. Les deux opérateurs sélectionnent le même titre de repli."
 
 ["web/src/sync/projection-tri.ts"]
-sha256 = "62181b91489a1149cd1787919fdeaf434e322b73317b20fbe6c29be24a7eaf1b"
+sha256 = "ab2c5d12cf3949e401570e9e9519f8e0133689f385743e74ffe928d649d84f2a"
 ["web/src/sync/projection-tri.ts".sites]
 "24:15 < -> <=" = "Le retour sur égalité à la ligne précédente garantit que les deux identifiants diffèrent dans cette branche."

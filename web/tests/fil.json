@@ -1,0 +1,9 @@
+{
+  "expediteur": { "nom": "Noa", "adresse": "noa@recette.test" },
+  "extrait": "Extrait de la lettre",
+  "nombre_messages": 1,
+  "etoile": false,
+  "piece_jointe": false,
+  "repondu": false,
+  "transfere": false
+}

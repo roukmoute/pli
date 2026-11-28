@@ -50,12 +50,19 @@ export function projeterTri(
       fils.set(fil.id, actuel ? fusionner(actuel, fil) : fil);
     }
   }
-  const premiere = Array.from(fils.values()).sort(comparerFils).slice(0, 20);
+  const tous = Array.from(fils.values()).sort(comparerFils);
+  // Les fils situés après la dernière ligne chargée arriveront avec leur page.
+  const borne = page.curseur_suivant
+    ? presents.sort(comparerFils).at(-1)
+    : undefined;
+  const charges = borne
+    ? tous.filter((f) => comparerFils(f, borne) <= 0)
+    : tous;
   return {
     ...page,
     expediteurs_en_attente: attente,
-    nouveaux: premiere.filter((f) => f.non_lu),
-    deja_vus: premiere.filter((f) => !f.non_lu),
+    nouveaux: charges.filter((f) => f.non_lu),
+    deja_vus: charges.filter((f) => !f.non_lu),
   };
 }
 

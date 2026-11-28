@@ -1,6 +1,6 @@
-export function reponseRetenue() {
-  let resolve!: (reponse: Response) => void;
-  const promise = new Promise<Response>((terminer) => {
+export function reponseRetenue<T = Response>() {
+  let resolve!: (reponse: T) => void;
+  const promise = new Promise<T>((terminer) => {
     resolve = terminer;
   });
   return { promise, resolve };

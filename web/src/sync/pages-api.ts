@@ -5,12 +5,27 @@ function estDossier(vue: Vue): vue is `dossier/${number}` {
   return vue.startsWith("dossier/");
 }
 
-export function lirePage(compte: number, vue: Vue): Promise<PageFils> {
+/** Portion de liste demandée. Sans taille, le serveur applique son réglage. */
+export interface Tranche {
+  curseur?: string;
+  taille?: number;
+}
+
+export function lirePage(
+  compte: number,
+  vue: Vue,
+  tranche: Tranche = {},
+): Promise<PageFils> {
   const id = estDossier(vue) ? Number(vue.slice("dossier/".length)) : undefined;
-  const chemin =
+  const liste =
     id === undefined
       ? (`/views/${vue}` as const)
       : (`/folders/${id}/messages` as const);
+  const suite = new URLSearchParams();
+  if (tranche.curseur) suite.set("curseur", tranche.curseur);
+  if (tranche.taille) suite.set("taille", String(tranche.taille));
+  const requete = suite.toString();
+  const chemin: `/${string}` = requete ? `${liste}?${requete}` : liste;
   return getJson(chemin, (corps) => {
     const page = corps as PageFils | null;
     if (

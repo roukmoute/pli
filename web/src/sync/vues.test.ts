@@ -1,7 +1,9 @@
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
+import { fil, ids, page } from "../../tests/fils";
+import { reponseRetenue } from "../../tests/reponse-retenue";
 import { lireDossiers, lirePage } from "./pages-api";
-import { creerCourrier, type Vue } from "./vues";
+import { creerCourrier, type PageFils, type Vue } from "./vues";
 
 const premiere = {
   compte: 5,
@@ -23,7 +25,12 @@ it("partage une requête en cours et conserve la dernière page en cas de coupur
   vi.stubGlobal("fetch", requete);
   const courrier = creerCourrier(5);
   const entree = courrier.obtenirVue("reception");
-  expect(entree.repere).toEqual({ defilement: 0, section: "nouveaux" });
+  expect(entree.repere).toEqual({
+    defilement: 0,
+    section: "nouveaux",
+    ordre: "date",
+    filtre: "tous",
+  });
   const premiereLecture = courrier.chargerVue("reception");
   expect(courrier.chargerVue("reception")).toBe(premiereLecture);
   expect(entree.etat()).toEqual({ statut: "chargement" });
@@ -174,4 +181,92 @@ it("actualise la vue de l’action et les autres pages qui contiennent une cible
     "/api/v1/views/reception",
   ]);
   fermer();
+});
+
+function fenetre(entree: { source: { valeur: () => PageFils | undefined } }) {
+  return entree.source.valeur() as PageFils;
+}
+
+it("demande la tranche d’une vue ou d’un dossier avec son curseur et sa taille", async () => {
+  const dossier = { ...premiere, vue: undefined, dossier: 4 };
+  const requete = vi.fn(async (url: string) =>
+    Response.json(url.includes("folders") ? dossier : premiere),
+  );
+  vi.stubGlobal("fetch", requete);
+  await lirePage(5, "reception");
+  await lirePage(5, "reception", { taille: 3 });
+  await lirePage(5, "dossier/4", { curseur: "apres b/c", taille: 40 });
+  await lirePage(5, "dossier/4", { curseur: "suite", taille: 0 });
+  expect(requete.mock.calls.map(([url]) => url)).toEqual([
+    "/api/v1/views/reception",
+    "/api/v1/views/reception?taille=3",
+    "/api/v1/folders/4/messages?curseur=apres+b%2Fc&taille=40",
+    "/api/v1/folders/4/messages?curseur=suite",
+  ]);
+});
+
+it("garde par vue les pages chargées et les relit toutes avant de les remplacer", async () => {
+  const [f6, f5, f4, f3] = [6, 5, 4, 3].map((n) => fil(`f${n}`, n * 100));
+  const pages: Record<string, PageFils> = {
+    "/api/v1/views/reception": page([f6, f5], "apres-f5"),
+    "/api/v1/views/reception?curseur=apres-f5": page([f4, f3]),
+    "/api/v1/views/flux": { ...page([f3], "apres-f3"), vue: "flux" },
+  };
+  const requete = vi.fn(async (url: string) => Response.json(pages[url]));
+  vi.stubGlobal("fetch", requete);
+  const courrier = creerCourrier(3);
+  const reception = courrier.obtenirVue("reception");
+  const flux = courrier.obtenirVue("flux");
+  await Promise.all([reception.charger(), flux.charger()]);
+  await reception.suite.charger();
+  expect(ids(fenetre(reception)).nouveaux).toEqual(["f6", "f5", "f4", "f3"]);
+  expect(fenetre(reception).curseur_suivant).toBeNull();
+  expect(ids(fenetre(flux)).nouveaux).toEqual(["f3"]);
+  expect(fenetre(flux).curseur_suivant).toBe("apres-f3");
+
+  // Le fil f4 est lu depuis un autre appareil : la relecture couvre sa page.
+  const relu = { ...f4, non_lu: false };
+  pages["/api/v1/views/reception?curseur=apres-f5&taille=2"] = page([relu, f3]);
+  requete.mockClear();
+  await courrier.chargerVue("reception");
+  expect(requete.mock.calls.map(([url]) => url)).toEqual([
+    "/api/v1/views/reception",
+    "/api/v1/views/reception?curseur=apres-f5&taille=2",
+  ]);
+  expect(ids(fenetre(reception))).toEqual({
+    nouveaux: ["f6", "f5", "f3"],
+    deja_vus: ["f4"],
+  });
+  flush();
+  expect(reception.etat()).toMatchObject({
+    statut: "pret",
+    valeur: { deja_vus: [relu] },
+    perime: false,
+  });
+});
+
+it("conserve la page arrivée pendant qu’une relecture voyage encore", async () => {
+  const [f6, f5, f4, f3] = [6, 5, 4, 3].map((n) => fil(`f${n}`, n * 100));
+  const haut = page([f6, f5], "apres-f5");
+  const requete = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(haut));
+  vi.stubGlobal("fetch", requete);
+  const courrier = creerCourrier(3);
+  const entree = courrier.obtenirVue("reception");
+  expect(entree.source.valeur()).toBeUndefined();
+  await entree.charger();
+  const relecture = reponseRetenue();
+  requete
+    .mockReturnValueOnce(relecture.promise)
+    .mockResolvedValueOnce(Response.json(page([f4, f3], "apres-f3")));
+  const actualisation = entree.charger();
+  await entree.suite.charger();
+  expect(ids(fenetre(entree)).nouveaux).toEqual(["f6", "f5", "f4", "f3"]);
+  const etoile = { ...f6, etoile: true };
+  relecture.resolve(Response.json(page([etoile, f5], "apres-f5")));
+  await actualisation;
+  expect(fenetre(entree).nouveaux).toEqual([etoile, f5, f4, f3]);
+  expect(fenetre(entree).curseur_suivant).toBe("apres-f3");
+  expect(requete).toHaveBeenCalledTimes(3);
 });

@@ -1,5 +1,6 @@
+import { creerArrivees, creerSuite, integrer, relire } from "./fenetre";
 import { appliquerLecture, creerLectures } from "./lecture";
-import { lireDossiers, lirePage } from "./pages-api";
+import { lireDossiers, lirePage, type Tranche } from "./pages-api";
 import { amorcerVue, projeterTri } from "./projection-tri";
 import { type Etat, ressource } from "./ressource";
 import { creerSelection, type Indicateur } from "./selection";
@@ -44,9 +45,15 @@ export interface Dossier {
   hidden: boolean;
 }
 
+// L’API sert aujourd’hui un seul ordre et une liste entière.
+export type Ordre = "date";
+export type Filtre = "tous";
+
 export interface Repere {
   defilement: number;
   section: Section;
+  ordre: Ordre;
+  filtre: Filtre;
   fil?: string;
   ancre?: { fil: string; decalage: number };
   lecture?: { fil: string; section: Section; ordre: string[] };
@@ -58,16 +65,30 @@ function nouvelleVue(
   actualiser: (ids: string[], indicateur: Indicateur) => Promise<void>,
   afficher: (base: Etat<PageFils>) => Etat<PageFils>,
 ) {
-  const repere: Repere = { defilement: 0, section: "nouveaux" };
-  const source = ressource(() => lirePage(compte, vue));
+  const repere: Repere = {
+    defilement: 0,
+    section: "nouveaux",
+    ordre: "date",
+    filtre: "tous",
+  };
+  const lire = (tranche?: Tranche) => lirePage(compte, vue, tranche);
+  // La valeur est la fenêtre de toutes les pages chargées pour cette vue.
+  const source = ressource(
+    (connue?: PageFils) => relire(lire, connue),
+    integrer,
+  );
+  const etat = () => afficher(source.etat());
   return {
     source,
     charger: source.charger,
-    etat: () => afficher(source.etat()),
+    etat,
     repere,
     selection: creerSelection(vue, actualiser),
+    suite: creerSuite(source, lire),
+    arrivees: creerArrivees(etat),
   };
 }
+export type VueCourrier = ReturnType<typeof nouvelleVue>;
 
 // Le cache et les opérations de tri appartiennent à la session affichée.
 export function creerCourrier(compte: number) {

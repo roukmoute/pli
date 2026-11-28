@@ -17,7 +17,12 @@ function liste() {
   mesurer(arrivee, 22, 60);
   mesurer(atelier, 49, 94);
   mesurer(livre, 94, 136);
-  const repere: Repere = { defilement: 120, section: "nouveaux" };
+  const repere: Repere = {
+    defilement: 120,
+    section: "nouveaux",
+    ordre: "date",
+    filtre: "tous",
+  };
   return { zone, arrivee, atelier, livre, repere };
 }
 
