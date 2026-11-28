@@ -1,7 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { t } from "../i18n";
-import { Icone } from "../icons/Icone";
 import type { Dossier } from "../sync";
 import type { Archives } from "../sync/archives";
 import styles from "./courrier.module.css";
@@ -15,19 +14,10 @@ export function CommandeArchiver(props: {
   /** Dit la portée de l’action : message, fil ou sélection. */
   libelle: string;
   class?: string;
-  icone?: boolean;
 }) {
   onSettled(() => props.archives.preparer());
   return (
-    <button
-      type="button"
-      class={props.class}
-      aria-label={props.libelle}
-      onClick={() => props.lancer()}
-    >
-      <Show when={props.icone}>
-        <Icone nom="archive" libelle={props.libelle} />
-      </Show>
+    <button type="button" class={props.class} onClick={() => props.lancer()}>
       {props.libelle}
     </button>
   );
