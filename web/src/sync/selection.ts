@@ -38,13 +38,17 @@ export function creerSelection(
     patienter(true);
     signaler(0);
     try {
-      const reponse = await request("/messages/flags", "POST", {
-        ids,
-        vue,
-        indicateur,
-        valeur,
-      });
-      const resultats: Resultat[] = await reponse.json();
+      const resultats: Resultat[] = [];
+      // Le serveur confirme au plus cent fils par requête.
+      for (let debut = 0; debut < ids.length; debut += 100) {
+        const reponse = await request("/messages/flags", "POST", {
+          ids: ids.slice(debut, debut + 100),
+          vue,
+          indicateur,
+          valeur,
+        });
+        resultats.push(...(await reponse.json()));
+      }
       const confirmes = new Set(
         resultats.filter((r) => r.etat === "confirme").map((r) => r.id),
       );

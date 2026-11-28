@@ -51,3 +51,26 @@ it("réserve le lot pendant la confirmation et garde les cibles à réessayer", 
   expect([...choix.choisis()]).toEqual(["b"]);
   expect(actualiser).toHaveBeenCalledTimes(3);
 });
+
+it("confirme plus de cent fils chargés en plusieurs requêtes", async () => {
+  const lots: string[][] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, options: RequestInit) => {
+      const { ids } = JSON.parse(String(options.body));
+      lots.push(ids);
+      return Response.json(ids.map((id: string) => ({ id, etat: "confirme" })));
+    }),
+  );
+  const choix = creerSelection(
+    "reception",
+    vi.fn(async () => {}),
+  );
+  const fils = Array.from({ length: 201 }, (_, n) => `fil-${n}`);
+  choix.cocher(fils, true);
+  await choix.marquer(fils, "lu", true);
+  expect(lots.map((lot) => lot.length)).toEqual([100, 100, 1]);
+  expect(lots.flat()).toEqual(fils);
+  expect(choix.echecs()).toBe(0);
+  expect(choix.choisis().size).toBe(0);
+});
