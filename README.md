@@ -26,6 +26,8 @@ L’étoile, « Marquer comme lu » et « Marquer comme non lu » s’appliquent
 
 « Archiver » range dans le dossier Archives de votre messagerie les fils sélectionnés ou le fil ouvert. Ils quittent la liste dès votre geste et la barre de sélection indique l’archivage en attente jusqu’à la confirmation. Un fil que la messagerie refuse revient dans la liste, déjà sélectionné, pour que vous puissiez réessayer. Si votre messagerie n’annonce aucun dossier d’archives, Pli vous demande une fois lequel de vos dossiers les recevra.
 
+« Supprimer » envoie les fils dans la Corbeille de votre messagerie, sans confirmation. Depuis la Corbeille, « Restaurer » les remet dans leur dossier d’origine. « Supprimer définitivement » et « Vider le dossier » vous demandent d’abord de confirmer, en citant le dossier et le nombre de fils concernés.
+
 ## Essayer Pli
 
 Depuis la racine du projet, lancez l’interface de développement et ouvrez [Pli sur votre machine](http://127.0.0.1:5173).
