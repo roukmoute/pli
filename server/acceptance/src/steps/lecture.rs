@@ -27,7 +27,26 @@ impl World {
             self.lecture = observer(&mut commande_navigation(script, self.address)).await?;
             return Ok(true);
         }
+        if texte
+            == "je charge les pages de Réception, change de dossier puis reçois une lettre dans le navigateur"
+        {
+            let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../bench/pagination.mjs");
+            self.lecture = observer(&mut commande_navigation(script, self.address)).await?;
+            return Ok(true);
+        }
         for (prefixe, suffixe, mesure) in [
+            (
+                "les pages chargées présentent ",
+                " fils sans doublon",
+                "fils",
+            ),
+            (
+                "le retour replace le focus sur une ligne de la page ",
+                "",
+                "page",
+            ),
+            ("l’arrivée déplace la ligne survolée de ", " pixel", "ecart"),
+            ("l’accès aux nouveautés annonce ", " fil", "arrivees"),
             ("la sélection partielle annonce ", " fils", "selection"),
             ("le lot marque ", " messages lus dans la boîte", "marques"),
             (
@@ -77,6 +96,16 @@ mod tests {
     async fn exige_la_mesure_de_chaque_geste() {
         let mut world = World::new("127.0.0.1:1".parse().unwrap()).unwrap();
         for (etape, champ) in [
+            (
+                "les pages chargées présentent <n> fils sans doublon",
+                "fils",
+            ),
+            (
+                "le retour replace le focus sur une ligne de la page <n>",
+                "page",
+            ),
+            ("l’arrivée déplace la ligne survolée de <n> pixel", "ecart"),
+            ("l’accès aux nouveautés annonce <n> fil", "arrivees"),
             ("la sélection partielle annonce <n> fils", "selection"),
             ("le lot marque <n> messages lus dans la boîte", "marques"),
             (

@@ -42,6 +42,14 @@ duree_session() {
         echo 120
     fi
 }
+# Avec quatre fils par page, la boîte de recette en compte plus de trois.
+taille_page() {
+    if [[ $1 == pagination-des-fils ]]; then
+        echo 4
+    else
+        echo 20
+    fi
+}
 mkdir -p build/acceptance/{ir,dry}
 
 for feature in "${features[@]}"; do
@@ -51,7 +59,7 @@ for feature in "${features[@]}"; do
     aps gherkin-parser "$feature" "$ir"
     aps gherkin-ir-dry-checker "$ir" "build/acceptance/dry/$nom.json"
     acceptance-entrypoint-generator "$ir" "$suite"
-    WEBMAIL_SESSION_TTL_SECONDS=$(duree_session "$nom") "$suite/run"
+    WEBMAIL_SESSION_TTL_SECONDS=$(duree_session "$nom") WEBMAIL_PAGE_SIZE=$(taille_page "$nom") "$suite/run"
 done
 
 if [[ ${1-} == mutation ]]; then
@@ -62,7 +70,8 @@ if [[ ${1-} == mutation ]]; then
         mkdir -p "$travail/features"
         cp "$feature" "$travail/$feature"
         echo "Rapport de mutation : $travail/rapport.json"
-        (cd "$travail" && WEBMAIL_SESSION_TTL_SECONDS=$(duree_session "$nom") aps gherkin-mutator --feature "$feature" --level full \
+        (cd "$travail" && WEBMAIL_SESSION_TTL_SECONDS=$(duree_session "$nom") WEBMAIL_PAGE_SIZE=$(taille_page "$nom") \
+            aps gherkin-mutator --feature "$feature" --level full \
             --generated-dir "$racine/acceptance/generated/$nom" --work-dir . \
             --runner-worker "acceptance-runner --worker" --json) > "$travail/rapport.json"
     done
