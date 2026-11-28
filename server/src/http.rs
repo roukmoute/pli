@@ -6,7 +6,7 @@ use axum::{
     http::{HeaderValue, StatusCode, header::CACHE_CONTROL},
     middleware::{self, Next},
     response::Response,
-    routing::get,
+    routing::{get, put},
 };
 use serde::Serialize;
 use tower_http::{
@@ -35,6 +35,7 @@ pub fn router(
         .merge(crate::pages::router(crate::pages::PageConfig::from_env()?))
         .merge(crate::tri::router())
         .route("/v1/folders", get(sync::folders))
+        .route("/v1/folders/archive", put(sync::choisir_archives))
         .nest("/admin/v1", admin::router(db.clone(), config))
         .route("/v1/health", get(health))
         .fallback(async || api_error(StatusCode::NOT_FOUND, "not_found", "Route API inconnue."))

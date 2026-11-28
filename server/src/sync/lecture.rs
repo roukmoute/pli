@@ -1,3 +1,4 @@
+mod deplacement;
 mod operations;
 
 use std::{
@@ -120,11 +121,7 @@ impl Lecteur {
         valeur: bool,
     ) -> Result<BTreeMap<u32, bool>, Error> {
         let mut session = self.session(compte, generation, chemin, true).await?;
-        let ids = uids
-            .iter()
-            .map(u32::to_string)
-            .collect::<Vec<_>>()
-            .join(",");
+        let ids = ensemble(uids);
         let signe = if valeur { "+" } else { "-" };
         let commande = format!("UID STORE {ids} {signe}FLAGS ({drapeau})");
         let mut etats = BTreeMap::new();
@@ -149,6 +146,14 @@ impl Lecteur {
         .await?;
         Ok(etats)
     }
+}
+
+// Ensemble d’UID d’une commande IMAP.
+fn ensemble(uids: &[u32]) -> String {
+    uids.iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn attributs<'a>(reply: &'a Response<'_>, uid: u32) -> Option<&'a [AttributeValue<'a>]> {

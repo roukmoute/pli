@@ -44,12 +44,18 @@ pub(crate) struct FolderView {
     delimiter: Option<String>,
     role: Option<String>,
     hidden: bool,
+    selectable: bool,
 }
 
+// Un seul dossier porte le rôle des archives : celui qui les reçoit.
 pub(super) fn folders(db: &Connection, account: i64) -> rusqlite::Result<Vec<FolderView>> {
     db.prepare(
-        "SELECT id, remote_path, delimiter, role, hidden FROM folders
-                WHERE account_id=?1 ORDER BY remote_path",
+        "SELECT f.id, f.remote_path, f.delimiter,
+                CASE WHEN f.id=a.folder_id THEN 'archive' WHEN f.role='archive' THEN NULL
+                     ELSE f.role END,
+                f.hidden, f.uidvalidity IS NOT NULL
+         FROM folders f JOIN archive_folders a ON a.account_id=f.account_id
+         WHERE f.account_id=?1 ORDER BY f.remote_path",
     )?
     .query_map([account], |row| {
         Ok(FolderView {
@@ -58,7 +64,21 @@ pub(super) fn folders(db: &Connection, account: i64) -> rusqlite::Result<Vec<Fol
             delimiter: row.get(2)?,
             role: row.get(3)?,
             hidden: row.get(4)?,
+            selectable: row.get(5)?,
         })
     })?
     .collect()
+}
+
+/// Retient le dossier personnel qui recevra les archives du compte.
+/// Rend faux si ce dossier n’est pas un dossier personnel ouvrable de ce compte.
+pub(super) fn choose_archive(db: &Connection, account: i64, folder: i64) -> rusqlite::Result<bool> {
+    let chosen = db.execute(
+        "INSERT INTO archive_choices(account_id, folder_id)
+         SELECT account_id, id FROM folders
+         WHERE account_id=?1 AND id=?2 AND role IS NULL AND uidvalidity IS NOT NULL
+         ON CONFLICT(account_id) DO UPDATE SET folder_id=excluded.folder_id",
+        params![account, folder],
+    )?;
+    Ok(chosen > 0)
 }

@@ -21,6 +21,7 @@ impl std::error::Error for Refus {}
 
 // Les flux LIST/FETCH de la bibliothèque se terminent aussi sur NO ou sur EOF.
 // Seule la réponse OK étiquetée permet de publier le lot ou d'avancer le repère de lecture.
+// Elle est remise à `collect` avec les autres : son code annonce par exemple les UID d'une copie.
 pub(super) async fn command(
     session: &mut ImapSession,
     command: &str,
@@ -34,7 +35,7 @@ pub(super) async fn command(
                     tag: end, status, ..
                 } if *end == tag => {
                     return match status {
-                        Status::Ok => Ok(()),
+                        Status::Ok => collect(reply.parsed()),
                         _ => Err(Refus.into()),
                     };
                 }

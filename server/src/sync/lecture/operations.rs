@@ -12,7 +12,7 @@ use super::Lecteur;
 use crate::{
     Error,
     db::Database,
-    operations::{Depot, Lot, comptes_en_attente, conclure, prochain},
+    operations::{Action, Depot, Lot, comptes_en_attente, conclure, prochain, tenter},
     sync::imap::Refus,
 };
 
@@ -61,32 +61,51 @@ impl Lecteur {
     pub(crate) async fn rattraper(&self, compte: i64) -> Result<(), Error> {
         let db = &self.context.db;
         while let Some(lot) = sqlite(db, move |db| prochain(db, compte)).await? {
+            let lot = Arc::new(lot);
             let depot = self.deposer(compte, &lot).await?;
             sqlite(db, move |db| conclure(db, compte, &lot, &depot)).await?;
         }
         Ok(())
     }
 
-    async fn deposer(&self, compte: i64, lot: &Lot) -> Result<Depot, Error> {
+    async fn deposer(&self, compte: i64, lot: &Arc<Lot>) -> Result<Depot, Error> {
         // Dossier disparu ou régénéré : plus aucune de ces lettres n’est joignable.
         let Some(chemin) = &lot.chemin else {
             return Ok(Depot::Applique(BTreeMap::new()));
         };
-        let reponse = self
-            .marquer(
-                compte,
-                lot.generation,
-                chemin,
-                &lot.uids,
-                &lot.drapeau,
-                lot.valeur,
-            )
-            .await;
+        let reponse = match &lot.action {
+            Action::Drapeau { drapeau, valeur } => self
+                .marquer(compte, lot.generation, chemin, &lot.uids, drapeau, *valeur)
+                .await
+                .map(Depot::Applique),
+            Action::Deplacement(Some(arrivee)) => {
+                self.deplacer(compte, lot, chemin, &arrivee.chemin).await
+            }
+            // Le dossier d’arrivée a disparu : les lettres restent où elles sont.
+            Action::Deplacement(None) => Err(Refus.into()),
+        };
         match reponse {
-            Ok(etats) => Ok(Depot::Applique(etats)),
+            Ok(depot) => Ok(depot),
             Err(refus) if refus.is::<Refus>() => Ok(Depot::Refuse),
             Err(panne) => Err(panne),
         }
+    }
+
+    async fn deplacer(
+        &self,
+        compte: i64,
+        lot: &Arc<Lot>,
+        chemin: &str,
+        arrivee: &str,
+    ) -> Result<Depot, Error> {
+        let depart = self
+            .partir(compte, lot.generation, chemin, &lot.uids)
+            .await?;
+        // La trace précède la commande : une coupure ne fera pas passer pour
+        // disparue une lettre que cette commande a déplacée.
+        let (trace, presentes) = (lot.clone(), depart.presentes.clone());
+        sqlite(&self.context.db, move |db| tenter(db, &trace, &presentes)).await?;
+        depart.transferer(arrivee).await
     }
 }
 

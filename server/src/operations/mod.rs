@@ -1,3 +1,4 @@
+mod deplacement;
 mod stockage;
 #[cfg(test)]
 mod tests;
@@ -18,7 +19,8 @@ use crate::{
     session::CompteAuthentifie,
     sync::Lecteur,
 };
-pub(crate) use stockage::{Depot, Lot, comptes_en_attente, conclure, prochain};
+pub(crate) use deplacement::tenter;
+pub(crate) use stockage::{Action, Depot, Lot, Sort, comptes_en_attente, conclure, prochain};
 
 pub(crate) fn router(lecteur: Lecteur) -> Router<Arc<Database>> {
     Router::new()
@@ -51,7 +53,15 @@ async fn creer(
         return Err(invalide(StatusCode::BAD_REQUEST));
     }
     let compte = compte.account_id;
-    let operation = sqlite(db, move |db| stockage::creer(db, compte, &demande)).await?;
+    let operation = sqlite(db, move |db| stockage::creer(db, compte, &demande))
+        .await?
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::CONFLICT,
+                "archives_inconnues",
+                "Aucun dossier ne reçoit les archives de ce compte.",
+            )
+        })?;
     // La réponse part sans attendre la messagerie.
     lecteur.appliquer(compte);
     Ok(Json(operation))

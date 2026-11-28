@@ -14,9 +14,13 @@ use std::{
     time::Duration,
 };
 
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::{State, rejection::JsonRejection},
+    http::StatusCode,
+};
 use ring::aead::LessSafeKey;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, oneshot},
     task::{JoinHandle, spawn_blocking},
@@ -27,7 +31,7 @@ use crate::{
     Error,
     admin::{self, ImapSession, LoginFailure},
     db::Database,
-    http::{ApiError, unavailable},
+    http::{ApiError, api_error, unavailable},
     session::{CompteAuthentifie, decrypt},
 };
 
@@ -212,6 +216,40 @@ pub(crate) async fn folders(
     State(db): State<Arc<Database>>,
 ) -> Result<Json<Folders>, ApiError> {
     let folders = read(db, account, store::folders).await?;
+    Ok(Json(Folders { folders }))
+}
+
+#[derive(Deserialize)]
+pub(crate) struct ChoixArchives {
+    dossier: i64,
+}
+
+/// Associe aux archives du compte un de ses dossiers personnels, puis rend la liste à jour.
+pub(crate) async fn choisir_archives(
+    account: CompteAuthentifie,
+    State(db): State<Arc<Database>>,
+    choix: Result<Json<ChoixArchives>, JsonRejection>,
+) -> Result<Json<Folders>, ApiError> {
+    let invalide = |statut| {
+        api_error(
+            statut,
+            "dossier_invalide",
+            "Ce dossier ne peut pas recevoir les archives.",
+        )
+    };
+    let Json(choix) = choix.map_err(|e| invalide(e.status()))?;
+    let compte = account.account_id;
+    let folders = spawn_blocking(move || -> Result<_, Error> {
+        let writer = db.writer()?;
+        if !store::choose_archive(&writer, compte, choix.dossier)? {
+            return Ok(None);
+        }
+        Ok(Some(store::folders(&writer, compte)?))
+    })
+    .await
+    .map_err(unavailable)?
+    .map_err(unavailable)?
+    .ok_or_else(|| invalide(StatusCode::UNPROCESSABLE_ENTITY))?;
     Ok(Json(Folders { folders }))
 }
 

@@ -4,7 +4,7 @@ use tokio::{sync::mpsc, task::JoinHandle, time::timeout};
 
 use super::*;
 
-const OPERATIONS: &str = "/api/v1/operations";
+pub(super) const OPERATIONS: &str = "/api/v1/operations";
 const OUVERTURE: &str = "/api/v1/messages/1-1-3/open";
 const A: &str = "0190a1b2-0000-7000-8000-00000000000a";
 const B: &str = "0190a1b2-0000-7000-8000-00000000000b";
@@ -12,14 +12,14 @@ const C: &str = "0190a1b2-0000-7000-8000-00000000000c";
 const LETTRE: &str = "1-1-3";
 const ETOILEE: &str = r#"["\\Flagged"]"#;
 
-struct Banc {
-    app: TestApp,
-    router: Router,
-    cookie: String,
+pub(super) struct Banc {
+    pub app: TestApp,
+    pub router: Router,
+    pub cookie: String,
 }
 
 // La lettre 3 d’Alice est non lue et porte une étoile.
-async fn banc() -> Result<(Banc, TcpListener), Error> {
+pub(super) async fn banc() -> Result<(Banc, TcpListener), Error> {
     let app = TestApp::new()?;
     let router = routes(&app, true, config());
     let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -35,7 +35,7 @@ async fn banc() -> Result<(Banc, TcpListener), Error> {
 }
 
 // Faux serveur qui annonce chaque dialogue terminé puis rend son écoute.
-fn messagerie(
+pub(super) fn messagerie(
     listener: TcpListener,
     dialogues: Vec<Dialogue>,
 ) -> (JoinHandle<TcpListener>, mpsc::UnboundedReceiver<()>) {
@@ -52,7 +52,7 @@ fn messagerie(
 }
 
 // Tous les dialogues prévus ont eu lieu et aucune autre connexion n’arrive.
-async fn sans_autre_commande(pair: JoinHandle<TcpListener>) -> Result<(), Error> {
+pub(super) async fn sans_autre_commande(pair: JoinHandle<TcpListener>) -> Result<(), Error> {
     let listener = timeout(Duration::from_secs(5), pair).await??;
     assert!(
         timeout(Duration::from_millis(50), listener.accept())
@@ -77,7 +77,7 @@ fn operation(id: &str, genre: &str) -> Value {
 }
 
 impl Banc {
-    async fn envoyer(&self, chemin: &str, corps: Value) -> Reply {
+    pub async fn envoyer(&self, chemin: &str, corps: Value) -> Reply {
         request(
             &self.router,
             Method::POST,
@@ -88,7 +88,7 @@ impl Banc {
         .await
     }
 
-    async fn lire(&self, chemin: &str) -> Value {
+    pub async fn lire(&self, chemin: &str) -> Value {
         request(
             &self.router,
             Method::GET,
@@ -100,12 +100,12 @@ impl Banc {
         .body
     }
 
-    async fn etat(&self, id: &str) -> Value {
+    pub async fn etat(&self, id: &str) -> Value {
         self.lire(&format!("{OPERATIONS}/{id}")).await
     }
 
     // Attend que la messagerie ait confirmé ou refusé l’opération.
-    async fn conclue(&self, id: &str) -> Value {
+    pub async fn conclue(&self, id: &str) -> Value {
         let attente = async {
             loop {
                 let operation = self.etat(id).await;

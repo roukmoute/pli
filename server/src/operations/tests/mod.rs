@@ -2,7 +2,11 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
-use super::stockage::{Demande, Depot, Genre, comptes_en_attente, conclure, creer, lire, prochain};
+mod archivage;
+
+use super::stockage::{
+    Action, Demande, Depot, Genre, Lot, comptes_en_attente, conclure, creer, lire, prochain,
+};
 use crate::{
     Error,
     test_support::{BOITES_DE_TEST, TestApp},
@@ -90,6 +94,13 @@ fn confirmes(uids: &[u32]) -> Depot {
     Depot::Applique(uids.iter().map(|&uid| (uid, true)).collect())
 }
 
+fn drapeau(lot: &Lot) -> (&str, bool) {
+    match &lot.action {
+        Action::Drapeau { drapeau, valeur } => (drapeau, *valeur),
+        Action::Deplacement(_) => panic!("Lot de drapeau attendu."),
+    }
+}
+
 #[test]
 fn une_operation_projette_son_etat_et_se_rejoue_sans_rien_reappliquer() -> Result<(), Error> {
     let app = boite()?;
@@ -160,8 +171,7 @@ fn chaque_dossier_forme_un_lot_et_la_derniere_lettre_clot_l_operation() -> Resul
     let lot = prochain(&app.db, ALICE)?.unwrap();
     assert_eq!(lot.chemin.as_deref(), Some("INBOX"));
     assert_eq!(lot.generation, 1);
-    assert_eq!(lot.drapeau, "\\Flagged");
-    assert!(lot.valeur);
+    assert_eq!(drapeau(&lot), ("\\Flagged", true));
     assert_eq!(lot.uids, [3, 4]);
     // La lettre 4 n’est pas rendue par le serveur, la lettre 3 est confirmée.
     conclure(&app.db, ALICE, &lot, &confirmes(&[3]))?;
@@ -204,8 +214,7 @@ fn un_fil_partiellement_confirme_garde_les_lettres_reussies() -> Result<(), Erro
     )?;
     assert_eq!(drapeaux(&app, INBOX, 4)?, "[]");
     let lot = prochain(&app.db, ALICE)?.unwrap();
-    assert_eq!(lot.drapeau, "\\Seen");
-    assert!(!lot.valeur);
+    assert_eq!(drapeau(&lot), ("\\Seen", false));
     conclure(&app.db, ALICE, &lot, &confirmes(&[3]))?;
     let operation = connue(&app, ALICE, A)?;
     assert_eq!(operation["etat"], "confirmee");
@@ -265,10 +274,10 @@ fn deux_intentions_opposees_convergent_vers_la_derniere() -> Result<(), Error> {
     enregistrer(&app, ALICE, &demande(B, Genre::NonLu, None, &[LETTRE]))?;
     assert_eq!(drapeaux(&app, INBOX, 3)?, "[]");
     let lue = prochain(&app.db, ALICE)?.unwrap();
-    assert!(lue.valeur);
+    assert_eq!(drapeau(&lue), ("\\Seen", true));
     conclure(&app.db, ALICE, &lue, &confirmes(&[3]))?;
     let non_lue = prochain(&app.db, ALICE)?.unwrap();
-    assert!(!non_lue.valeur);
+    assert_eq!(drapeau(&non_lue), ("\\Seen", false));
     conclure(&app.db, ALICE, &non_lue, &confirmes(&[3]))?;
     for id in [A, B] {
         assert_eq!(connue(&app, ALICE, id)?["etat"], "confirmee");
